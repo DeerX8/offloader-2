@@ -1,0 +1,19 @@
+[Unit]
+Description=Pi Archiver - USB to NAS file transfer service
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/pi-archiver
+ExecStart=/usr/bin/python3 -m flask run --host=0.0.0.0 --port=5000
+Environment=FLASK_APP=app.main:create_app
+Environment=PI_ARCHIVER_CONFIG_DIR=/etc/pi-archiver
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

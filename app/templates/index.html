@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="hu" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f172a">
+    <title>Pi Archiver</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #3b82f6; --accent-dark: #2563eb;
+            --bg: #0f172a; --bg-card: #1e293b; --bg-input: #334155;
+            --border: #475569; --text: #f1f5f9; --text-dim: #94a3b8;
+            --success: #22c55e; --danger: #ef4444; --warning: #f59e0b;
+        }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; }
+        .card { background: var(--bg-card); border-radius: 12px; border: 1px solid rgba(71,85,105,0.3); }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px;
+            transition: all 0.15s; cursor: pointer; border: none; user-select: none;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: #1e293b; }
+        input, select {
+            background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px 12px; color: var(--text); font-size: 14px; width: 100%;
+            transition: border-color 0.15s;
+        }
+        input:focus, select:focus { outline: none; border-color: var(--accent); }
+        .tab { padding: 10px 0; font-size: 13px; font-weight: 600; color: var(--text-dim); cursor: pointer;
+               border-bottom: 2px solid transparent; transition: all 0.15s; text-align: center; flex: 1; }
+        .tab.active { color: var(--accent); border-color: var(--accent); }
+        .file-item {
+            display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+            border-bottom: 1px solid rgba(71,85,105,0.2); cursor: pointer;
+            transition: background 0.1s; user-select: none;
+        }
+        .file-item:active { background: rgba(59,130,246,0.1); }
+        .file-item.selected { background: rgba(59,130,246,0.15); }
+        .file-item.archived-item { opacity: 0.6; }
+        .checkbox {
+            width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border);
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .checkbox.checked { background: var(--accent); border-color: var(--accent); }
+        .checkbox.checked::after { content: "✓"; color: white; font-size: 13px; font-weight: bold; }
+        .progress-bar { height: 6px; border-radius: 3px; background: var(--bg-input); overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+        .progress-fill.speedtest { background: var(--warning); }
+        .badge {
+            display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px;
+            font-size: 11px; font-weight: 600; white-space: nowrap;
+        }
+        .badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .badge-green { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
+        .badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
+        .badge-archived { background: rgba(34,197,94,0.15); color: #4ade80; font-size: 10px; padding: 1px 6px; }
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
+            z-index: 100; animation: toastIn 0.3s ease; max-width: 90vw;
+        }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
+        .spinner { width: 18px; height: 18px; border: 2px solid var(--border);
+                   border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .fade-in { animation: fadeIn 0.2s ease; }
+        @keyframes fadeIn { from { opacity: 0; } }
+        .bottom-bar { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+        .toggle { position: relative; width: 44px; height: 24px; border-radius: 12px; cursor: pointer;
+                  background: var(--border); transition: background 0.2s; flex-shrink: 0; }
+        .toggle.on { background: var(--accent); }
+        .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+                         border-radius: 50%; background: white; transition: transform 0.2s; }
+        .toggle.on::after { transform: translateX(20px); }
+    </style>
+</head>
+<body class="h-full flex flex-col">
+
+<!-- Header -->
+<header class="flex items-center justify-between px-4 py-3" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
+    <h1 class="text-lg font-bold">📦 Pi Archiver</h1>
+    <div class="flex items-center gap-3">
+        <div id="nas-indicator" class="flex items-center gap-1.5 text-xs" style="color:var(--text-dim);">
+            <span id="nas-dot" style="width:8px;height:8px;border-radius:50%;background:var(--border);"></span>
+            <span id="nas-label">NAS</span>
+        </div>
+    </div>
+</header>
+
+<!-- Tab Navigation -->
+<nav class="flex px-4" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
+    <div class="tab active" data-tab="files" onclick="switchTab('files')">📂 Fájlok</div>
+    <div class="tab" data-tab="transfers" onclick="switchTab('transfers')">📤 Átvitel</div>
+    <div class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Beállítás</div>
+</nav>
+
+<!-- Content Area -->
+<main class="flex-1 overflow-y-auto">
+
+<!-- ==================== FILES TAB ==================== -->
+<div id="tab-files" class="fade-in">
+    <!-- Device + Filter -->
+    <div class="px-4 py-3" style="border-bottom:1px solid rgba(71,85,105,0.2);">
+        <div class="flex items-center gap-2 mb-2">
+            <select id="device-select" onchange="onDeviceChange()" style="flex:1;">
+                <option value="">💾 USB eszköz keresése...</option>
+            </select>
+            <button class="btn btn-outline btn-sm" onclick="refreshDevices()" title="Frissítés">🔄</button>
+        </div>
+        <div class="flex items-center gap-2">
+            <select id="filter-select" onchange="onFilterChange()" style="flex:1;">
+                <option value="all">Minden fájl</option>
+                <option value="photo">📷 Fotók</option>
+                <option value="video">🎬 Videók</option>
+                <option value="photo_video" selected>📷🎬 Fotó + Videó</option>
+            </select>
+            <span id="file-count" class="text-xs" style="color:var(--text-dim);white-space:nowrap;">—</span>
+        </div>
+    </div>
+
+    <!-- Breadcrumb -->
+    <div id="breadcrumb" class="px-4 py-2 flex items-center gap-1 text-sm overflow-x-auto" style="color:var(--text-dim);white-space:nowrap;"></div>
+
+    <!-- File List -->
+    <div id="file-list" class="pb-20">
+        <div class="px-4 py-8 text-center" style="color:var(--text-dim);">
+            <p class="text-lg mb-2">💾</p>
+            <p>Csatlakoztass egy USB meghajtót</p>
+            <p class="text-sm mt-1">Automatikusan felismeri az eszközt</p>
+        </div>
+    </div>
+
+    <!-- Transfer Bar -->
+    <div id="transfer-bar" class="bottom-bar hidden" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-card);border-top:1px solid rgba(71,85,105,0.3);padding:12px 16px;z-index:50;">
+        <div class="flex items-center justify-between">
+            <div>
+                <span id="selected-count" class="font-bold">0</span> fájl
+                <span id="selected-size" class="text-sm" style="color:var(--text-dim);"></span>
+            </div>
+            <div class="flex gap-2">
+                <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕</button>
+                <button class="btn btn-warning btn-sm" onclick="runSpeedtest()">🏎️ Teszt</button>
+                <button class="btn btn-primary btn-sm" onclick="startTransferFromSelection()">📤 Másolás</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== TRANSFERS TAB ==================== -->
+<div id="tab-transfers" class="hidden fade-in">
+    <!-- Speedtest Card -->
+    <div id="speedtest-card" class="mx-4 mt-4 card p-3 hidden">
+        <div class="flex items-center justify-between mb-2">
+            <span class="font-bold text-sm">🏎️ Speedtest</span>
+            <span id="speedtest-status" class="badge badge-yellow">Fut...</span>
+        </div>
+        <div class="progress-bar mb-2">
+            <div id="speedtest-progress" class="progress-fill speedtest" style="width:0%"></div>
+        </div>
+        <div id="speedtest-result" class="text-sm" style="color:var(--text-dim);"></div>
+    </div>
+
+    <div id="transfers-list" class="px-4 py-4">
+        <div class="text-center py-8" style="color:var(--text-dim);">
+            <p class="text-lg mb-2">📤</p>
+            <p>Még nincs átvitel</p>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== SETTINGS TAB ==================== -->
+<div id="tab-settings" class="hidden fade-in p-4 space-y-4 pb-8">
+    <!-- TrueNAS -->
+    <div class="card p-4">
+        <h3 class="font-bold mb-3">🖥️ TrueNAS szerver</h3>
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Szerver cím (Tailscale IP)</label>
+                <input id="s-host" type="text" placeholder="pl. 100.x.x.x">
+            </div>
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">SMB share neve</label>
+                <input id="s-share" type="text" placeholder="pl. archiv">
+            </div>
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alap útvonal a share-en belül</label>
+                <input id="s-path" type="text" placeholder="pl. /Photos/2025">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Felhasználó</label>
+                    <input id="s-user" type="text" placeholder="username">
+                </div>
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Jelszó</label>
+                    <input id="s-pass" type="password" placeholder="••••••">
+                </div>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="testNasConnection()">🔌 Kapcsolat tesztelése</button>
+        </div>
+    </div>
+
+    <!-- Transfer Settings -->
+    <div class="card p-4">
+        <h3 class="font-bold mb-3">📤 Átvitel</h3>
+        <div class="space-y-3">
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alapértelmezett cél mappa</label>
+                <input id="s-dest" type="text" placeholder="pl. /Napi">
+            </div>
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Sávszélesség limit (KB/s, 0 = korlátlan)</label>
+                <input id="s-bwlimit" type="number" value="0" min="0">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Újrapróbálkozás (db)</label>
+                    <input id="s-retry" type="number" value="5" min="0" max="20">
+                </div>
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Várakozás retry közt (mp)</label>
+                    <input id="s-retry-delay" type="number" value="3" min="1" max="30">
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <input id="s-partial" type="checkbox" checked style="width:auto;">
+                <label for="s-partial" class="text-sm">Félbeszakadt átvitel folytatása</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discord -->
+    <div class="card p-4">
+        <h3 class="font-bold mb-3">💬 Discord értesítések</h3>
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <span class="text-sm">Discord értesítések</span>
+                <div id="s-discord-toggle" class="toggle" onclick="toggleDiscord()"></div>
+            </div>
+            <div id="discord-settings" class="space-y-3 hidden">
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Webhook URL</label>
+                    <input id="s-discord-url" type="text" placeholder="https://discord.com/api/webhooks/...">
+                </div>
+                <div class="flex gap-2">
+                    <button class="btn btn-outline btn-sm" onclick="testDiscord()">🔔 Teszt küldése</button>
+                </div>
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Értesítés gyakorisága (%)</label>
+                    <select id="s-notify-interval">
+                        <option value="5">Minden 5%-nál</option>
+                        <option value="10" selected>Minden 10%-nál</option>
+                        <option value="25">Minden 25%-nál</option>
+                        <option value="50">50%-nál és végén</option>
+                    </select>
+                </div>
+                <div class="space-y-2 text-sm">
+                    <label class="flex items-center gap-2">
+                        <input id="s-notify-start" type="checkbox" checked style="width:auto;"> Indításkor
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input id="s-notify-complete" type="checkbox" checked style="width:auto;"> Befejezéskor
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input id="s-notify-error" type="checkbox" checked style="width:auto;"> Hiba esetén
+                    </label>
+                    <label class="flex items-center gap-2">
+                        <input id="s-notify-speedtest" type="checkbox" checked style="width:auto;"> Speedtest után
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Archive Stats -->
+    <div class="card p-4">
+        <h3 class="font-bold mb-3">📋 Archiválási napló</h3>
+        <div id="archive-stats" class="text-sm mb-3" style="color:var(--text-dim);">Betöltés...</div>
+        <button class="btn btn-danger btn-sm" onclick="clearArchive()">🗑️ Napló törlése</button>
+    </div>
+
+    <!-- Save -->
+    <button class="btn btn-primary w-full" onclick="saveSettings()">💾 Beállítások mentése</button>
+</div>
+
+</main>
+
+<script>
+// ==================== State ====================
+let state = {
+    currentMount: null,
+    currentPath: '/',
+    filter: 'photo_video',
+    selectedFiles: new Map(),
+    pollInterval: null,
+    speedtestPoll: null,
+};
+
+// ==================== Tab Navigation ====================
+function switchTab(tab) {
+    document.querySelectorAll('[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.toggle('hidden', el.id !== `tab-${tab}`));
+    if (tab === 'transfers') pollTransfers();
+    if (tab === 'settings') { loadSettings(); loadArchiveStats(); }
+}
+
+// ==================== Toast ====================
+function toast(msg, type = 'info') {
+    const colors = { info: 'var(--accent)', success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)' };
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.style.background = colors[type] || colors.info;
+    el.style.color = 'white';
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+}
+
+// ==================== API helpers ====================
+async function api(endpoint, opts = {}) {
+    try {
+        const res = await fetch(`/api${endpoint}`, {
+            headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+            ...opts,
+            body: opts.body ? JSON.stringify(opts.body) : undefined,
+        });
+        return await res.json();
+    } catch (e) {
+        console.error('API error:', e);
+        return { error: 'Hálózati hiba – ellenőrizd a kapcsolatot' };
+    }
+}
+
+// ==================== USB Devices ====================
+async function refreshDevices() {
+    const sel = document.getElementById('device-select');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">⏳ Keresés...</option>';
+
+    const data = await api('/devices');
+    sel.innerHTML = '<option value="">💾 Válassz USB eszközt</option>';
+
+    if (data.devices && data.devices.length > 0) {
+        data.devices.forEach(dev => {
+            const opt = document.createElement('option');
+            opt.value = JSON.stringify(dev);
+            const label = dev.label || dev.device;
+            const status = dev.mounted ? ' ✅' : '';
+            opt.textContent = `${label} (${dev.size}, ${dev.filesystem})${status}`;
+            sel.appendChild(opt);
+        });
+        if (data.devices.length === 1 && !state.currentMount) {
+            sel.selectedIndex = 1;
+            onDeviceChange();
+        }
+    } else {
+        sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>';
+    }
+}
+
+async function onDeviceChange() {
+    const sel = document.getElementById('device-select');
+    if (!sel.value) return;
+    const dev = JSON.parse(sel.value);
+
+    if (dev.mounted && dev.mountpoint) {
+        state.currentMount = dev.mountpoint;
+        state.currentPath = '/';
+        loadFiles();
+        return;
+    }
+
+    const data = await api('/devices/mount', { method: 'POST', body: { device: dev.device } });
+    if (data.mounted) {
+        state.currentMount = data.mountpoint;
+        state.currentPath = '/';
+        toast('Eszköz csatlakoztatva', 'success');
+        loadFiles();
+    } else {
+        toast(data.error || 'Mount hiba', 'error');
+    }
+}
+
+// ==================== File Browser ====================
+async function loadFiles() {
+    if (!state.currentMount) return;
+    const listEl = document.getElementById('file-list');
+    listEl.innerHTML = '<div class="px-4 py-8 text-center"><div class="spinner mx-auto"></div></div>';
+
+    const data = await api(`/files?mount=${encodeURIComponent(state.currentMount)}&path=${encodeURIComponent(state.currentPath)}&filter=${state.filter}`);
+    if (data.error) {
+        listEl.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--danger);">❌ ${data.error}</div>`;
+        return;
+    }
+    renderBreadcrumb(data.current_path || '/');
+    renderFileList(data);
+}
+
+function renderBreadcrumb(path) {
+    const el = document.getElementById('breadcrumb');
+    const parts = path.split('/').filter(Boolean);
+    let html = `<span class="cursor-pointer" onclick="navigateTo('/')" style="color:var(--accent);">🏠</span>`;
+    let accumulated = '';
+    parts.forEach((part, i) => {
+        accumulated += '/' + part;
+        const p = accumulated;
+        html += ` <span style="color:var(--border);">/</span> `;
+        if (i === parts.length - 1) {
+            html += `<span class="font-medium">${part}</span>`;
+        } else {
+            html += `<span class="cursor-pointer" onclick="navigateTo('${p}')" style="color:var(--accent);">${part}</span>`;
+        }
+    });
+    el.innerHTML = html;
+}
+
+function renderFileList(data) {
+    const listEl = document.getElementById('file-list');
+    const countEl = document.getElementById('file-count');
+    const archivedNote = data.archived_count > 0 ? ` (${data.archived_count} ✅)` : '';
+    countEl.textContent = `${data.total_files || 0} fájl${archivedNote}`;
+
+    if (!data.directories.length && !data.files.length) {
+        listEl.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--text-dim);">📭 Üres mappa</div>`;
+        return;
+    }
+
+    let html = '';
+
+    data.directories.forEach(dir => {
+        html += `
+        <div class="file-item" onclick="navigateTo('${dir.path}')">
+            <span style="font-size:22px;">📁</span>
+            <div style="flex:1;min-width:0;">
+                <div class="font-medium truncate">${dir.name}</div>
+                <div class="text-xs" style="color:var(--text-dim);">${dir.items} elem</div>
+            </div>
+            <span style="color:var(--text-dim);">›</span>
+        </div>`;
+    });
+
+    data.files.forEach(file => {
+        const fullPath = `${state.currentMount}/${file.path}`;
+        const selected = state.selectedFiles.has(fullPath);
+        const icon = getFileIcon(file.extension);
+        const archivedClass = file.archived ? ' archived-item' : '';
+        const archivedBadge = file.archived ? '<span class="badge badge-archived ml-1">✅ Archived</span>' : '';
+
+        html += `
+        <div class="file-item${archivedClass} ${selected ? 'selected' : ''}" onclick="toggleFile('${fullPath}', '${escHtml(file.name)}', ${file.size}, ${file.modified})">
+            <div class="checkbox ${selected ? 'checked' : ''}"></div>
+            <span style="font-size:20px;">${icon}</span>
+            <div style="flex:1;min-width:0;">
+                <div class="text-sm font-medium truncate">${escHtml(file.name)}${archivedBadge}</div>
+                <div class="text-xs" style="color:var(--text-dim);">${file.size_human}</div>
+            </div>
+        </div>`;
+    });
+
+    listEl.innerHTML = html;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+
+function getFileIcon(ext) {
+    const m = {
+        '.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.heic':'🖼️','.heif':'🖼️','.tiff':'🖼️','.tif':'🖼️',
+        '.raw':'📸','.cr2':'📸','.cr3':'📸','.nef':'📸','.arw':'📸','.orf':'📸','.rw2':'📸','.dng':'📸',
+        '.mp4':'🎬','.mov':'🎬','.avi':'🎬','.mkv':'🎬','.mts':'🎬','.m2ts':'🎬','.mxf':'🎬','.braw':'🎬',
+    };
+    return m[ext] || '📄';
+}
+
+function navigateTo(path) { state.currentPath = path; loadFiles(); }
+function onFilterChange() { state.filter = document.getElementById('filter-select').value; loadFiles(); }
+
+// ==================== File Selection ====================
+function toggleFile(fullPath, name, size, mtime) {
+    if (state.selectedFiles.has(fullPath)) {
+        state.selectedFiles.delete(fullPath);
+    } else {
+        state.selectedFiles.set(fullPath, { name, size, fullPath, mtime });
+    }
+    updateSelectionUI();
+    loadFiles();
+}
+
+function clearSelection() { state.selectedFiles.clear(); updateSelectionUI(); loadFiles(); }
+
+function updateSelectionUI() {
+    const bar = document.getElementById('transfer-bar');
+    const count = state.selectedFiles.size;
+    if (count > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('selected-count').textContent = count;
+        const totalBytes = Array.from(state.selectedFiles.values()).reduce((s, f) => s + f.size, 0);
+        document.getElementById('selected-size').textContent = `(${humanSize(totalBytes)})`;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function humanSize(bytes) {
+    const u = ['B','KB','MB','GB','TB'];
+    let i = 0;
+    while (bytes >= 1024 && i < u.length - 1) { bytes /= 1024; i++; }
+    return `${bytes.toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
+}
+
+// ==================== Speedtest ====================
+async function runSpeedtest() {
+    const totalBytes = Array.from(state.selectedFiles.values()).reduce((s, f) => s + f.size, 0);
+
+    const data = await api('/speedtest', {
+        method: 'POST',
+        body: { total_pending_bytes: totalBytes },
+    });
+    if (data.error) { toast(data.error, 'error'); return; }
+
+    toast('Speedtest indítva...', 'info');
+    switchTab('transfers');
+
+    const card = document.getElementById('speedtest-card');
+    card.classList.remove('hidden');
+    document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-yellow">Fut...</span>';
+    document.getElementById('speedtest-result').textContent = '';
+
+    clearInterval(state.speedtestPoll);
+    state.speedtestPoll = setInterval(async () => {
+        const st = await api('/speedtest');
+        document.getElementById('speedtest-progress').style.width = `${st.progress || 0}%`;
+
+        if (st.running) {
+            const spd = st.speed > 0 ? `${humanSize(st.speed)}/s` : '—';
+            document.getElementById('speedtest-result').textContent = `Sebesség: ${spd}`;
+        } else {
+            clearInterval(state.speedtestPoll);
+            if (st.error) {
+                document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-red">Hiba</span>';
+                document.getElementById('speedtest-result').textContent = st.error;
+            } else if (st.result) {
+                const r = st.result;
+                document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-green">Kész</span>';
+                let txt = `Írási sebesség: ${r.avg_speed_human}`;
+                if (r.estimated_eta) txt += ` | Becsült idő ${r.pending_human}-hez: ${r.estimated_eta}`;
+                document.getElementById('speedtest-result').textContent = txt;
+            }
+        }
+    }, 500);
+}
+
+// ==================== Transfer ====================
+async function startTransferFromSelection() {
+    if (state.selectedFiles.size === 0) return;
+
+    const files = [];
+    const sizes = [];
+    for (const f of state.selectedFiles.values()) {
+        files.push(f.fullPath);
+        sizes.push(f.size);
+    }
+
+    const data = await api('/transfer', {
+        method: 'POST',
+        body: { files, sizes, destination: '' },
+    });
+
+    if (data.error) { toast(data.error, 'error'); return; }
+
+    toast(`Átvitel indítva (${files.length} fájl)`, 'success');
+    clearSelection();
+    switchTab('transfers');
+}
+
+// ==================== Transfer Polling ====================
+async function pollTransfers() {
+    clearInterval(state.pollInterval);
+
+    const update = async () => {
+        const data = await api('/transfers');
+        if (data.transfers) renderTransfers(data.transfers);
+        const hasActive = data.transfers?.some(t => ['pending','mounting','transferring'].includes(t.status));
+        if (!hasActive) clearInterval(state.pollInterval);
+    };
+
+    await update();
+    state.pollInterval = setInterval(update, 1000);
+}
+
+function renderTransfers(transfers) {
+    const el = document.getElementById('transfers-list');
+    if (!transfers.length) {
+        el.innerHTML = `<div class="text-center py-8" style="color:var(--text-dim);"><p class="text-lg mb-2">📤</p><p>Még nincs átvitel</p></div>`;
+        return;
+    }
+
+    el.innerHTML = transfers.map(t => {
+        const badges = {
+            pending: '<span class="badge badge-yellow">Várakozik</span>',
+            mounting: '<span class="badge badge-yellow">Csatlakozás...</span>',
+            transferring: '<span class="badge badge-blue">Másolás</span>',
+            completed: '<span class="badge badge-green">Kész ✓</span>',
+            failed: '<span class="badge badge-red">Hiba ✗</span>',
+            cancelled: '<span class="badge badge-red">Megszakítva</span>',
+        };
+        const isActive = ['pending','mounting','transferring'].includes(t.status);
+        const retryNote = t.retry_count > 0 ? `<span class="text-xs ml-2" style="color:var(--warning);">🔄 ${t.retry_count} retry</span>` : '';
+
+        return `
+        <div class="card p-3 mb-3">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    ${isActive ? '<div class="spinner"></div>' : ''}
+                    ${badges[t.status] || ''}${retryNote}
+                </div>
+                <span class="text-xs" style="color:var(--text-dim);">${t.files_done}/${t.files_total} fájl · ${t.total_bytes_human}</span>
+            </div>
+            ${t.current_file ? `<div class="text-sm truncate mb-2" style="color:var(--text-dim);">${t.current_file}</div>` : ''}
+            <div class="progress-bar mb-1">
+                <div class="progress-fill" style="width:${t.progress.toFixed(1)}%"></div>
+            </div>
+            <div class="flex justify-between text-xs" style="color:var(--text-dim);">
+                <span>${t.progress.toFixed(1)}%</span>
+                <span>${[t.speed, t.avg_speed ? 'Átl: ' + t.avg_speed : '', t.eta ? 'ETA: ' + t.eta : ''].filter(Boolean).join(' · ')}</span>
+            </div>
+            ${t.error ? `<div class="text-xs mt-2" style="color:var(--danger);">⚠️ ${t.error}</div>` : ''}
+            ${isActive ? `<button class="btn btn-danger btn-sm mt-2 w-full" onclick="cancelJob('${t.id}')">Megszakítás</button>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function cancelJob(id) { await api(`/transfer/${id}/cancel`, { method: 'POST' }); pollTransfers(); }
+
+// ==================== Settings ====================
+async function loadSettings() {
+    const data = await api('/settings');
+    if (data.error) return;
+
+    document.getElementById('s-host').value = data.truenas?.host || '';
+    document.getElementById('s-share').value = data.truenas?.share || '';
+    document.getElementById('s-path').value = data.truenas?.path || '';
+    document.getElementById('s-user').value = data.truenas?.username || '';
+    document.getElementById('s-pass').value = data.truenas?.password || '';
+    document.getElementById('s-dest').value = data.transfer?.default_destination || '';
+    document.getElementById('s-bwlimit').value = data.transfer?.bandwidth_limit || 0;
+    document.getElementById('s-retry').value = data.transfer?.retry_attempts ?? 5;
+    document.getElementById('s-retry-delay').value = data.transfer?.retry_delay ?? 3;
+    document.getElementById('s-partial').checked = data.transfer?.partial_transfer !== false;
+
+    // Discord
+    const dc = data.discord || {};
+    const toggle = document.getElementById('s-discord-toggle');
+    const settings = document.getElementById('discord-settings');
+    if (dc.enabled) { toggle.classList.add('on'); settings.classList.remove('hidden'); }
+    else { toggle.classList.remove('on'); settings.classList.add('hidden'); }
+    document.getElementById('s-discord-url').value = dc.webhook_url || '';
+    document.getElementById('s-notify-interval').value = dc.notify_interval || 10;
+    document.getElementById('s-notify-start').checked = dc.notify_on_start !== false;
+    document.getElementById('s-notify-complete').checked = dc.notify_on_complete !== false;
+    document.getElementById('s-notify-error').checked = dc.notify_on_error !== false;
+    document.getElementById('s-notify-speedtest').checked = dc.notify_on_speedtest !== false;
+}
+
+function toggleDiscord() {
+    const toggle = document.getElementById('s-discord-toggle');
+    const settings = document.getElementById('discord-settings');
+    toggle.classList.toggle('on');
+    settings.classList.toggle('hidden');
+}
+
+async function saveSettings() {
+    const discordOn = document.getElementById('s-discord-toggle').classList.contains('on');
+    const body = {
+        truenas: {
+            host: document.getElementById('s-host').value.trim(),
+            share: document.getElementById('s-share').value.trim(),
+            path: document.getElementById('s-path').value.trim(),
+            username: document.getElementById('s-user').value.trim(),
+            password: document.getElementById('s-pass').value,
+        },
+        transfer: {
+            default_destination: document.getElementById('s-dest').value.trim(),
+            bandwidth_limit: parseInt(document.getElementById('s-bwlimit').value) || 0,
+            partial_transfer: document.getElementById('s-partial').checked,
+            retry_attempts: parseInt(document.getElementById('s-retry').value) || 5,
+            retry_delay: parseInt(document.getElementById('s-retry-delay').value) || 3,
+        },
+        discord: {
+            enabled: discordOn,
+            webhook_url: document.getElementById('s-discord-url').value.trim(),
+            notify_interval: parseInt(document.getElementById('s-notify-interval').value) || 10,
+            notify_on_start: document.getElementById('s-notify-start').checked,
+            notify_on_complete: document.getElementById('s-notify-complete').checked,
+            notify_on_error: document.getElementById('s-notify-error').checked,
+            notify_on_speedtest: document.getElementById('s-notify-speedtest').checked,
+        },
+    };
+
+    const data = await api('/settings', { method: 'POST', body });
+    if (data.saved) { toast('Beállítások mentve ✓', 'success'); checkNasStatus(); }
+    else toast(data.error || 'Mentési hiba', 'error');
+}
+
+async function testNasConnection() {
+    toast('Kapcsolódás...', 'info');
+    const data = await api('/nas/status');
+    toast(data.connected ? 'TrueNAS elérhető ✓' : (data.error || 'Nem elérhető'), data.connected ? 'success' : 'error');
+}
+
+async function testDiscord() {
+    const url = document.getElementById('s-discord-url').value.trim();
+    if (!url) { toast('Adj meg egy webhook URL-t', 'warning'); return; }
+    const data = await api('/discord/test', { method: 'POST', body: { webhook_url: url } });
+    toast(data.success ? 'Teszt üzenet elküldve ✓' : (data.error || 'Hiba'), data.success ? 'success' : 'error');
+}
+
+// ==================== Archive ====================
+async function loadArchiveStats() {
+    const data = await api('/archive/stats');
+    const el = document.getElementById('archive-stats');
+    if (data.total_files !== undefined) {
+        el.textContent = `${data.total_files} fájl archiválva (${data.total_size_human})`;
+    } else {
+        el.textContent = 'Nem elérhető';
+    }
+}
+
+async function clearArchive() {
+    if (!confirm('Biztosan törölni akarod az archiválási naplót? A fájlok a NAS-on maradnak, de újra másolhatók lesznek.')) return;
+    const data = await api('/archive/clear', { method: 'POST' });
+    if (data.cleared) { toast('Napló törölve', 'success'); loadArchiveStats(); }
+}
+
+// ==================== NAS Status ====================
+async function checkNasStatus() {
+    const dot = document.getElementById('nas-dot');
+    const label = document.getElementById('nas-label');
+    const data = await api('/nas/status');
+    if (data.connected) { dot.style.background = 'var(--success)'; label.textContent = 'NAS ✓'; }
+    else { dot.style.background = 'var(--danger)'; label.textContent = 'NAS ✗'; }
+}
+
+// ==================== Init ====================
+document.addEventListener('DOMContentLoaded', () => {
+    refreshDevices();
+    checkNasStatus();
+    setInterval(refreshDevices, 5000);
+    setInterval(checkNasStatus, 30000);
+});
+</script>
+</body>
+</html>
