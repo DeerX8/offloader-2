@@ -6,8 +6,29 @@ import time
 import threading
 from pathlib import Path
 
-from app.config import load_config, _human_size
+from app.config import load_config, save_config, _human_size
 from app.transfer import mount_smb, SMB_MOUNT_POINT, _build_rsync_dest
+
+
+def save_last_speedtest(avg_speed: float):
+    """Save last speedtest speed to config for persistent ETA calculations."""
+    config = load_config()
+    config.setdefault("speedtest", {})
+    config["speedtest"]["last_speed"] = avg_speed
+    config["speedtest"]["last_speed_human"] = f"{_human_size(int(avg_speed))}/s"
+    config["speedtest"]["timestamp"] = __import__("time").time()
+    save_config(config)
+
+
+def get_last_speedtest() -> dict:
+    """Get last saved speedtest result."""
+    config = load_config()
+    st = config.get("speedtest", {})
+    return {
+        "last_speed": st.get("last_speed", 0),
+        "last_speed_human": st.get("last_speed_human", ""),
+        "timestamp": st.get("timestamp", 0),
+    }
 
 _speedtest_state = {
     "running": False,
@@ -140,6 +161,9 @@ def _run_speedtest(total_pending_bytes: int):
             _speedtest_state["progress"] = 100
             _speedtest_state["speed"] = avg_speed
             _speedtest_state["result"] = speedtest_result
+
+        # Save result persistently so ETA works across sessions
+        save_last_speedtest(avg_speed)
 
         # Discord
         from app.discord_notify import notify_speedtest_result

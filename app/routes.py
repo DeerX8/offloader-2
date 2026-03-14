@@ -12,7 +12,7 @@ from app.transfer import (
     get_transfer, get_transfers, start_transfer,
     remove_transfer, clear_finished_transfers,
 )
-from app.speedtest import get_speedtest_state, start_speedtest
+from app.speedtest import get_speedtest_state, start_speedtest, get_last_speedtest
 from app.discord_notify import test_webhook
 
 api = Blueprint("api", __name__, url_prefix="/api")
@@ -144,6 +144,12 @@ def api_speedtest_start():
 @api.route("/speedtest")
 def api_speedtest_status():
     return jsonify(get_speedtest_state())
+
+
+@api.route("/speedtest/last")
+def api_speedtest_last():
+    """Get last saved speedtest result for ETA calculations."""
+    return jsonify(get_last_speedtest())
 
 
 # --- Archive ---

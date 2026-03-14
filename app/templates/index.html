@@ -137,6 +137,12 @@
 
     <div id="breadcrumb" class="px-4 py-2 flex items-center gap-1 text-sm overflow-x-auto" style="color:var(--text-dim);white-space:nowrap;"></div>
 
+    <!-- Select All bar (shown when files are listed) -->
+    <div id="select-all-bar" class="hidden px-4 py-1 flex items-center justify-between" style="border-bottom:1px solid rgba(71,85,105,0.2);">
+        <button class="btn btn-outline btn-sm" onclick="selectAllFiles()">☑️ Mind kijelölése</button>
+        <span id="select-info" class="text-xs" style="color:var(--text-dim);"></span>
+    </div>
+
     <div id="file-list" class="pb-20">
         <div class="px-4 py-8 text-center" style="color:var(--text-dim);">
             <p class="text-lg mb-2">💾</p>
@@ -145,15 +151,15 @@
     </div>
 
     <div id="transfer-bar" class="bottom-bar hidden" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-card);border-top:1px solid rgba(71,85,105,0.3);padding:12px 16px;z-index:50;">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-1">
             <div>
                 <span id="selected-count" class="font-bold">0</span> fájl
                 <span id="selected-size" class="text-sm" style="color:var(--text-dim);"></span>
+                <span id="selected-eta" class="text-sm" style="color:var(--warning);"></span>
             </div>
             <div class="flex gap-2">
                 <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕</button>
-                <button class="btn btn-warning btn-sm" onclick="runSpeedtest()">🏎️</button>
-                <button class="btn btn-primary btn-sm" onclick="startTransferFromSelection()">📤 Másolás</button>
+                <button class="btn btn-primary btn-sm" onclick="confirmTransfer()">📤 Másolás</button>
             </div>
         </div>
     </div>
@@ -161,15 +167,19 @@
 
 <!-- ==================== TRANSFERS TAB ==================== -->
 <div id="tab-transfers" class="hidden fade-in">
-    <div id="speedtest-card" class="mx-4 mt-4 card p-3 hidden">
+    <!-- Speedtest Section (always visible) -->
+    <div class="mx-4 mt-4 card p-3">
         <div class="flex items-center justify-between mb-2">
             <span class="font-bold text-sm">🏎️ Speedtest</span>
-            <span id="speedtest-status" class="badge badge-yellow">Fut...</span>
+            <div class="flex items-center gap-2">
+                <span id="speedtest-status" class="badge badge-blue">—</span>
+                <button id="speedtest-btn" class="btn btn-warning btn-sm" onclick="runSpeedtest()">▶ Indítás</button>
+            </div>
         </div>
         <div class="progress-bar mb-2">
             <div id="speedtest-progress" class="progress-fill speedtest" style="width:0%"></div>
         </div>
-        <div id="speedtest-result" class="text-sm" style="color:var(--text-dim);"></div>
+        <div id="speedtest-result" class="text-sm" style="color:var(--text-dim);">Még nem volt mérés</div>
     </div>
     <div id="transfers-list" class="px-4 py-4">
         <div class="text-center py-8" style="color:var(--text-dim);">
@@ -366,6 +376,8 @@ let state = {
     currentMount: null, currentPath: '/', filter: 'photo_video',
     selectedFiles: new Map(), pollInterval: null, speedtestPoll: null,
     transferMode: 'ssh',
+    lastSpeed: 0, // bytes/sec from last speedtest
+    currentFiles: [], // current file listing for select all
 };
 
 // ==================== Tabs ====================
@@ -475,6 +487,23 @@ function renderFileList(data) {
     const el = document.getElementById('file-list');
     const arc = data.archived_count > 0 ? ` (${data.archived_count} ✅)` : '';
     document.getElementById('file-count').textContent = `${data.total_files || 0} fájl${arc}`;
+
+    // Store files for select-all
+    state.currentFiles = data.files.map(f => ({
+        fullPath: `${state.currentMount}/${f.path}`,
+        name: f.name, size: f.size, mtime: f.modified, archived: f.archived,
+    }));
+
+    // Show/hide select all bar
+    const saBar = document.getElementById('select-all-bar');
+    if (data.files.length > 0) {
+        saBar.classList.remove('hidden');
+        const allSelected = data.files.every(f => state.selectedFiles.has(`${state.currentMount}/${f.path}`));
+        document.getElementById('select-info').textContent = allSelected ? 'Mind ki van jelölve' : '';
+    } else {
+        saBar.classList.add('hidden');
+    }
+
     if (!data.directories.length && !data.files.length) { el.innerHTML = '<div class="px-4 py-8 text-center" style="color:var(--text-dim);">📭 Üres</div>'; return; }
     let html = '';
     data.directories.forEach(d => {
@@ -508,40 +537,107 @@ function toggleFile(fp, name, size, mt) {
     state.selectedFiles.has(fp) ? state.selectedFiles.delete(fp) : state.selectedFiles.set(fp, {name,size,fullPath:fp,mtime:mt});
     updateSelectionUI(); loadFiles();
 }
+function selectAllFiles() {
+    const allSelected = state.currentFiles.every(f => state.selectedFiles.has(f.fullPath));
+    if (allSelected) {
+        // Deselect all in current view
+        state.currentFiles.forEach(f => state.selectedFiles.delete(f.fullPath));
+    } else {
+        // Select all in current view
+        state.currentFiles.forEach(f => {
+            if (!state.selectedFiles.has(f.fullPath)) {
+                state.selectedFiles.set(f.fullPath, { name: f.name, size: f.size, fullPath: f.fullPath, mtime: f.mtime });
+            }
+        });
+    }
+    updateSelectionUI(); loadFiles();
+}
 function clearSelection() { state.selectedFiles.clear(); updateSelectionUI(); loadFiles(); }
 function updateSelectionUI() {
     const bar = document.getElementById('transfer-bar');
     const n = state.selectedFiles.size;
-    if (n > 0) { bar.classList.remove('hidden'); document.getElementById('selected-count').textContent = n;
-        document.getElementById('selected-size').textContent = `(${humanSize(Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0))})`; }
-    else bar.classList.add('hidden');
+    if (n > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('selected-count').textContent = n;
+        const totalBytes = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+        document.getElementById('selected-size').textContent = `(${humanSize(totalBytes)})`;
+        // Show ETA based on last speedtest
+        const etaEl = document.getElementById('selected-eta');
+        if (state.lastSpeed > 0) {
+            const etaSec = totalBytes / state.lastSpeed;
+            etaEl.textContent = `· ETA: ${formatEta(etaSec)}`;
+        } else {
+            etaEl.textContent = '';
+        }
+    } else {
+        bar.classList.add('hidden');
+    }
 }
 function humanSize(b) { const u=['B','KB','MB','GB','TB']; let i=0; while(b>=1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i===0?0:1)} ${u[i]}`; }
+function formatEta(sec) {
+    if (sec < 60) return `${Math.round(sec)}mp`;
+    if (sec < 3600) return `${Math.floor(sec/60)}p ${Math.round(sec%60)}mp`;
+    return `${Math.floor(sec/3600)}ó ${Math.floor((sec%3600)/60)}p`;
+}
 
 // ==================== Speedtest ====================
 async function runSpeedtest() {
     const tb = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
     const d = await api('/speedtest', { method:'POST', body:{total_pending_bytes:tb} });
     if (d.error) { toast(d.error,'error'); return; }
-    toast('Speedtest...','info'); switchTab('transfers');
-    document.getElementById('speedtest-card').classList.remove('hidden');
+    toast('Speedtest indítva...','info');
+    switchTab('transfers');
+    document.getElementById('speedtest-btn').disabled = true;
     document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-yellow">Fut...</span>';
-    document.getElementById('speedtest-result').textContent = '';
+    document.getElementById('speedtest-result').textContent = 'Mérés...';
+    document.getElementById('speedtest-progress').style.width = '0%';
     clearInterval(state.speedtestPoll);
     state.speedtestPoll = setInterval(async () => {
         const st = await api('/speedtest');
         document.getElementById('speedtest-progress').style.width = `${st.progress||0}%`;
-        if (st.running) { document.getElementById('speedtest-result').textContent = st.speed > 0 ? `${humanSize(st.speed)}/s` : 'Mérés...'; }
-        else { clearInterval(state.speedtestPoll);
-            if (st.error) { document.getElementById('speedtest-status').innerHTML='<span class="badge badge-red">Hiba</span>'; document.getElementById('speedtest-result').textContent=st.error; }
-            else if (st.result) { const r=st.result; document.getElementById('speedtest-status').innerHTML=`<span class="badge badge-green">Kész (${r.mode})</span>`;
-                document.getElementById('speedtest-result').textContent = `${r.avg_speed_human}${r.estimated_eta ? ' · ETA: '+r.estimated_eta+' ('+r.pending_human+')':''}`;
+        if (st.running) {
+            document.getElementById('speedtest-result').textContent = st.speed > 0 ? `Sebesség: ${humanSize(st.speed)}/s` : 'Mérés...';
+        } else {
+            clearInterval(state.speedtestPoll);
+            document.getElementById('speedtest-btn').disabled = false;
+            if (st.error) {
+                document.getElementById('speedtest-status').innerHTML='<span class="badge badge-red">Hiba</span>';
+                document.getElementById('speedtest-result').textContent=st.error;
+            } else if (st.result) {
+                const r=st.result;
+                state.lastSpeed = r.avg_speed;
+                document.getElementById('speedtest-status').innerHTML=`<span class="badge badge-green">${r.avg_speed_human}</span>`;
+                let txt = `Írási sebesség: ${r.avg_speed_human} (${r.mode})`;
+                if (r.estimated_eta) txt += ` · ETA ${r.pending_human}-hez: ${r.estimated_eta}`;
+                document.getElementById('speedtest-result').textContent = txt;
+                updateSelectionUI(); // Refresh ETA in selection bar
             }
         }
     }, 500);
 }
 
+async function loadLastSpeedtest() {
+    const d = await api('/speedtest/last');
+    if (d.last_speed > 0) {
+        state.lastSpeed = d.last_speed;
+        document.getElementById('speedtest-status').innerHTML = `<span class="badge badge-green">${d.last_speed_human}</span>`;
+        document.getElementById('speedtest-result').textContent = `Utolsó mérés: ${d.last_speed_human}`;
+    }
+}
+
 // ==================== Transfer ====================
+function confirmTransfer() {
+    if (!state.selectedFiles.size) return;
+    const n = state.selectedFiles.size;
+    const totalBytes = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+    let msg = `${n} fájl másolása (${humanSize(totalBytes)})`;
+    if (state.lastSpeed > 0) {
+        msg += `\nBecsült idő: ${formatEta(totalBytes / state.lastSpeed)}`;
+    }
+    msg += '\n\nElindítod?';
+    if (confirm(msg)) startTransferFromSelection();
+}
+
 async function startTransferFromSelection() {
     if (!state.selectedFiles.size) return;
     const files=[], sizes=[];
@@ -597,7 +693,7 @@ function renderTransfers(ts) {
     el.innerHTML = html;
 }
 
-async function cancelJob(id) { await api(`/transfer/${id}/cancel`,{method:'POST'}); pollTransfers(); }
+async function cancelJob(id) { if(confirm('Biztosan megszakítod az átvitelt?')) { await api(`/transfer/${id}/cancel`,{method:'POST'}); pollTransfers(); } }
 async function removeJob(id) { await api(`/transfer/${id}`,{method:'DELETE'}); pollTransfers(); }
 async function clearTransfers() { await api('/transfers/clear',{method:'POST'}); pollTransfers(); }
 
@@ -738,7 +834,7 @@ async function checkNasStatus() {
 
 // ==================== Init ====================
 document.addEventListener('DOMContentLoaded', () => {
-    refreshDevices(); checkNasStatus();
+    refreshDevices(); checkNasStatus(); loadLastSpeedtest();
     setInterval(refreshDevices, 5000);
     setInterval(checkNasStatus, 30000);
 });
