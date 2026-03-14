@@ -476,12 +476,16 @@ def _rsync_file(job, source, rsync_dest, extra_args, rsync_env) -> bool:
         "--info=progress2",
         "--no-inc-recursive",
         "--timeout=30",
-        "--contimeout=15",
         "--inplace",
         "--no-perms",
         "--no-owner",
         "--no-group",
     ]
+
+    # --contimeout only works with rsyncd, not SSH
+    mode = config["transfer"].get("mode", "ssh")
+    if mode == "rsyncd":
+        cmd.append("--contimeout=15")
 
     if transfer_cfg.get("partial_transfer", True):
         cmd.append("--partial")

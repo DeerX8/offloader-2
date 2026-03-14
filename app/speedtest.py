@@ -98,9 +98,11 @@ def _run_speedtest(total_pending_bytes: int):
 
         cmd = [
             "rsync", "-ah", "--no-inc-recursive",
-            "--timeout=30", "--contimeout=15",
+            "--timeout=30",
             "--inplace", "--no-perms", "--no-owner", "--no-group",
         ]
+        if mode == "rsyncd":
+            cmd.append("--contimeout=15")
         cmd.extend(extra_args)
         cmd.extend([str(local_tmp), rsync_dest])
 
