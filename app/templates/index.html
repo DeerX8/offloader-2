@@ -399,18 +399,41 @@ async function api(endpoint, opts = {}) {
 // ==================== USB ====================
 async function refreshDevices() {
     const sel = document.getElementById('device-select');
-    sel.innerHTML = '<option value="">⏳ Keresés...</option>';
+    // Remember current selection
+    const prevDevice = state.currentMount ? state.currentMount : null;
+
+    // Don't show "searching" if we already have a device selected
+    if (!prevDevice) sel.innerHTML = '<option value="">⏳ Keresés...</option>';
+
     const data = await api('/devices');
-    sel.innerHTML = '<option value="">💾 Válassz USB eszközt</option>';
+
+    // Build new options
+    let html = '<option value="">💾 Válassz USB eszközt</option>';
+    let autoSelectIdx = -1;
+
     if (data.devices?.length > 0) {
-        data.devices.forEach(dev => {
-            const opt = document.createElement('option');
-            opt.value = JSON.stringify(dev);
-            opt.textContent = `${dev.label || dev.device} (${dev.size}, ${dev.filesystem})${dev.mounted ? ' ✅' : ''}`;
-            sel.appendChild(opt);
+        data.devices.forEach((dev, i) => {
+            const val = JSON.stringify(dev);
+            const label = `${dev.label || dev.device} (${dev.size}, ${dev.filesystem})${dev.mounted ? ' ✅' : ''}`;
+            html += `<option value='${val.replace(/'/g, "&#39;")}'>${label}</option>`;
+
+            // Re-select previously mounted device
+            if (prevDevice && dev.mounted && dev.mountpoint === prevDevice) {
+                autoSelectIdx = i + 1; // +1 because of the placeholder option
+            }
         });
-        if (data.devices.length === 1 && !state.currentMount) { sel.selectedIndex = 1; onDeviceChange(); }
-    } else { sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>'; }
+
+        sel.innerHTML = html;
+
+        if (autoSelectIdx > 0) {
+            sel.selectedIndex = autoSelectIdx;
+        } else if (data.devices.length === 1 && !state.currentMount) {
+            sel.selectedIndex = 1;
+            onDeviceChange();
+        }
+    } else if (!prevDevice) {
+        sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>';
+    }
 }
 
 async function onDeviceChange() {
@@ -541,11 +564,24 @@ async function pollTransfers() {
 function renderTransfers(ts) {
     const el = document.getElementById('transfers-list');
     if (!ts.length) { el.innerHTML='<div class="text-center py-8" style="color:var(--text-dim);">📤 Még nincs átvitel</div>'; return; }
-    el.innerHTML = ts.map(t => {
+
+    const hasFinished = ts.some(t => ['completed','failed','cancelled'].includes(t.status));
+    let html = '';
+
+    if (hasFinished) {
+        html += '<div class="flex justify-end mb-3"><button class="btn btn-outline btn-sm" onclick="clearTransfers()">🗑️ Befejezettek törlése</button></div>';
+    }
+
+    html += ts.map(t => {
         const b = {pending:'badge-yellow',mounting:'badge-yellow',transferring:'badge-blue',completed:'badge-green',failed:'badge-red',cancelled:'badge-red'};
         const l = {pending:'Várakozik',mounting:'Csatlakozás',transferring:'Másolás',completed:'Kész ✓',failed:'Hiba ✗',cancelled:'Megszakítva'};
         const active = ['pending','mounting','transferring'].includes(t.status);
+        const finished = ['completed','failed','cancelled'].includes(t.status);
         const retry = t.retry_count>0 ? `<span class="text-xs ml-2" style="color:var(--warning);">🔄${t.retry_count}</span>` : '';
+        const removeBtn = finished ? `<button class="btn btn-outline btn-sm mt-2" onclick="removeJob('${t.id}')" style="flex:1;">🗑️ Törlés</button>` : '';
+        const cancelBtn = active ? `<button class="btn btn-danger btn-sm mt-2" onclick="cancelJob('${t.id}')" style="flex:1;">Megszakítás</button>` : '';
+        const buttons = (cancelBtn || removeBtn) ? `<div class="flex gap-2">${cancelBtn}${removeBtn}</div>` : '';
+
         return `<div class="card p-3 mb-3">
             <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2">${active?'<div class="spinner"></div>':''}<span class="badge ${b[t.status]}">${l[t.status]}</span>${retry}</div>
@@ -555,11 +591,15 @@ function renderTransfers(ts) {
             <div class="flex justify-between text-xs" style="color:var(--text-dim);"><span>${t.progress.toFixed(1)}%</span>
                 <span>${[t.speed,t.avg_speed?'Átl:'+t.avg_speed:'',t.eta?'ETA:'+t.eta:''].filter(Boolean).join(' · ')}</span></div>
             ${t.error?`<div class="text-xs mt-2" style="color:var(--danger);">⚠️ ${t.error}</div>`:''}
-            ${active?`<button class="btn btn-danger btn-sm mt-2 w-full" onclick="cancelJob('${t.id}')">Megszakítás</button>`:''}</div>`;
+            ${buttons}</div>`;
     }).join('');
+
+    el.innerHTML = html;
 }
 
 async function cancelJob(id) { await api(`/transfer/${id}/cancel`,{method:'POST'}); pollTransfers(); }
+async function removeJob(id) { await api(`/transfer/${id}`,{method:'DELETE'}); pollTransfers(); }
+async function clearTransfers() { await api('/transfers/clear',{method:'POST'}); pollTransfers(); }
 
 // ==================== Transfer Mode ====================
 function selectMode(mode) {

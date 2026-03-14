@@ -10,6 +10,11 @@ from app.config import load_config, is_archived
 
 def detect_usb_devices() -> list[dict]:
     """Detect USB storage devices using lsblk."""
+    # Skip system/boot partitions
+    SKIP_LABELS = {"bootfs", "boot", "EFI", "RECOVERY", "SETTINGS", "rootfs"}
+    SKIP_MOUNTPOINTS = {"/", "/boot", "/boot/firmware", "/boot/efi"}
+    SKIP_FSTYPES = {"swap"}
+
     try:
         result = subprocess.run(
             [
@@ -33,17 +38,28 @@ def detect_usb_devices() -> list[dict]:
             children = dev.get("children", [])
             if children:
                 for part in children:
-                    if part.get("fstype"):
-                        devices.append({
-                            "device": f"/dev/{part['name']}",
-                            "parent": f"/dev/{dev['name']}",
-                            "size": part.get("size", "?"),
-                            "filesystem": part.get("fstype", ""),
-                            "label": part.get("label", ""),
-                            "mountpoint": part.get("mountpoint"),
-                            "mounted": part.get("mountpoint") is not None,
-                        })
+                    if not part.get("fstype"):
+                        continue
+                    if part.get("label", "") in SKIP_LABELS:
+                        continue
+                    if part.get("mountpoint", "") in SKIP_MOUNTPOINTS:
+                        continue
+                    if part.get("fstype", "") in SKIP_FSTYPES:
+                        continue
+                    devices.append({
+                        "device": f"/dev/{part['name']}",
+                        "parent": f"/dev/{dev['name']}",
+                        "size": part.get("size", "?"),
+                        "filesystem": part.get("fstype", ""),
+                        "label": part.get("label", ""),
+                        "mountpoint": part.get("mountpoint"),
+                        "mounted": part.get("mountpoint") is not None,
+                    })
             elif dev.get("fstype"):
+                if dev.get("label", "") in SKIP_LABELS:
+                    continue
+                if dev.get("fstype", "") in SKIP_FSTYPES:
+                    continue
                 devices.append({
                     "device": f"/dev/{dev['name']}",
                     "parent": None,

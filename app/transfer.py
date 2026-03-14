@@ -92,6 +92,28 @@ def cancel_transfer(job_id: str) -> bool:
     return False
 
 
+def remove_transfer(job_id: str) -> bool:
+    """Remove a finished/failed/cancelled transfer from the list."""
+    with _transfer_lock:
+        job = _transfers.get(job_id)
+        if job and job.status in (TransferStatus.COMPLETED, TransferStatus.FAILED, TransferStatus.CANCELLED):
+            del _transfers[job_id]
+            return True
+    return False
+
+
+def clear_finished_transfers() -> int:
+    """Remove all finished/failed/cancelled transfers. Returns count removed."""
+    with _transfer_lock:
+        to_remove = [
+            k for k, v in _transfers.items()
+            if v.status in (TransferStatus.COMPLETED, TransferStatus.FAILED, TransferStatus.CANCELLED)
+        ]
+        for k in to_remove:
+            del _transfers[k]
+        return len(to_remove)
+
+
 def start_transfer(source_files: list[str], file_sizes: list[int], destination: str) -> str:
     job_id = str(uuid.uuid4())[:8]
     total = sum(file_sizes)
@@ -455,6 +477,10 @@ def _rsync_file(job, source, rsync_dest, extra_args, rsync_env) -> bool:
         "--no-inc-recursive",
         "--timeout=30",
         "--contimeout=15",
+        "--inplace",
+        "--no-perms",
+        "--no-owner",
+        "--no-group",
     ]
 
     if transfer_cfg.get("partial_transfer", True):

@@ -10,6 +10,7 @@ from app.storage import detect_usb_devices, list_files, mount_device, unmount_de
 from app.transfer import (
     cancel_transfer, check_connection,
     get_transfer, get_transfers, start_transfer,
+    remove_transfer, clear_finished_transfers,
 )
 from app.speedtest import get_speedtest_state, start_speedtest
 from app.discord_notify import test_webhook
@@ -105,6 +106,21 @@ def api_cancel_transfer(job_id):
     if cancel_transfer(job_id):
         return jsonify({"cancelled": True})
     return jsonify({"error": "Nem lehet törölni"}), 400
+
+
+@api.route("/transfer/<job_id>", methods=["DELETE"])
+def api_remove_transfer(job_id):
+    """Remove a finished/failed/cancelled transfer from the list."""
+    if remove_transfer(job_id):
+        return jsonify({"removed": True})
+    return jsonify({"error": "Aktív átvitel nem törölhető"}), 400
+
+
+@api.route("/transfers/clear", methods=["POST"])
+def api_clear_transfers():
+    """Remove all finished/failed/cancelled transfers."""
+    count = clear_finished_transfers()
+    return jsonify({"cleared": count})
 
 
 # --- NAS Connection ---

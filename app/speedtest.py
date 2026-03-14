@@ -21,7 +21,10 @@ _speedtest_lock = threading.Lock()
 
 SPEEDTEST_DURATION = 12  # seconds
 SPEEDTEST_CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
+SPEEDTEST_MAX_SIZE = 64 * 1024 * 1024  # Max 64MB local file (safe for tmpfs/SD)
 SPEEDTEST_FILENAME = ".pi-archiver-speedtest.tmp"
+# Use SD card, NOT /tmp (which is often a small tmpfs in RAM on Pi)
+SPEEDTEST_LOCAL_DIR = "/opt/pi-archiver"
 
 
 def get_speedtest_state() -> dict:
@@ -47,11 +50,14 @@ def _run_speedtest(total_pending_bytes: int):
     """Generate a temp file locally, then rsync it to NAS using the configured mode.
     Measures actual transfer throughput including protocol overhead."""
 
-    local_tmp = Path("/tmp") / SPEEDTEST_FILENAME
+    local_tmp = Path(SPEEDTEST_LOCAL_DIR) / SPEEDTEST_FILENAME
     config = load_config()
     mode = config["transfer"].get("mode", "ssh")
 
     try:
+        # Ensure local dir exists
+        Path(SPEEDTEST_LOCAL_DIR).mkdir(parents=True, exist_ok=True)
+
         # For SMB mode, mount first
         if mode == "smb":
             if not mount_smb():
@@ -61,20 +67,19 @@ def _run_speedtest(total_pending_bytes: int):
         # Build destination using same logic as transfers
         extra_args, rsync_dest, rsync_env = _build_rsync_dest(config, "")
 
-        # Generate test data locally
+        # Generate test data locally (capped at SPEEDTEST_MAX_SIZE)
         chunk = os.urandom(SPEEDTEST_CHUNK_SIZE)
         total_written = 0
         start_time = time.monotonic()
 
-        # Write chunks and rsync them in a loop
-        # Strategy: keep growing a local file and rsync it repeatedly
         with open(local_tmp, "wb") as f:
             while True:
                 elapsed = time.monotonic() - start_time
                 if elapsed >= SPEEDTEST_DURATION:
                     break
+                if total_written >= SPEEDTEST_MAX_SIZE:
+                    break
 
-                # Write one chunk locally
                 f.write(chunk)
                 f.flush()
                 total_written += SPEEDTEST_CHUNK_SIZE
@@ -94,6 +99,7 @@ def _run_speedtest(total_pending_bytes: int):
         cmd = [
             "rsync", "-ah", "--no-inc-recursive",
             "--timeout=30", "--contimeout=15",
+            "--inplace", "--no-perms", "--no-owner", "--no-group",
         ]
         cmd.extend(extra_args)
         cmd.extend([str(local_tmp), rsync_dest])
