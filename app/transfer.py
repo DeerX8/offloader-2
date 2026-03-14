@@ -1,4 +1,4 @@
-"""File transfer management: SMB mount + rsync with retry, archive tracking, Discord."""
+"""File transfer management: supports SMB, rsync-over-SSH, and rsyncd modes."""
 
 import os
 import re
@@ -6,7 +6,7 @@ import subprocess
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -43,7 +43,6 @@ class TransferJob:
     started_at: float = 0
     finished_at: float = 0
     retry_count: int = 0
-    # Discord notification tracking
     _last_notified_pct: int = -1
 
     def to_dict(self) -> dict:
@@ -94,13 +93,6 @@ def cancel_transfer(job_id: str) -> bool:
 
 
 def start_transfer(source_files: list[str], file_sizes: list[int], destination: str) -> str:
-    """Start a new transfer job.
-
-    Args:
-        source_files: Absolute paths to files on USB device
-        file_sizes: Size in bytes for each file (same order)
-        destination: Relative path within TrueNAS share
-    """
     job_id = str(uuid.uuid4())[:8]
     total = sum(file_sizes)
 
@@ -121,13 +113,31 @@ def start_transfer(source_files: list[str], file_sizes: list[int], destination: 
     return job_id
 
 
-def check_smb_connection() -> dict:
+# ==================== Connection Checks ====================
+
+
+def check_connection() -> dict:
+    """Check NAS connection based on current transfer mode."""
     config = load_config()
+    mode = config["transfer"].get("mode", "ssh")
+    host = config["truenas"]["host"]
+
+    if not host:
+        return {"connected": False, "error": "TrueNAS nincs konfigurálva", "mode": mode}
+
+    if mode == "smb":
+        return _check_smb(config)
+    elif mode == "ssh":
+        return _check_ssh(config)
+    elif mode == "rsyncd":
+        return _check_rsyncd(config)
+    return {"connected": False, "error": f"Ismeretlen mód: {mode}", "mode": mode}
+
+
+def _check_smb(config: dict) -> dict:
     nas = config["truenas"]
-
-    if not nas["host"] or not nas["share"]:
-        return {"connected": False, "error": "TrueNAS nincs konfigurálva"}
-
+    if not nas["share"]:
+        return {"connected": False, "error": "SMB share neve nincs megadva", "mode": "smb"}
     try:
         cmd = ["smbclient", "-L", f"//{nas['host']}", "-N", "--timeout=5"]
         if nas.get("username"):
@@ -138,15 +148,71 @@ def check_smb_connection() -> dict:
             ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
         if result.returncode == 0:
-            return {"connected": True, "host": nas["host"], "share": nas["share"]}
-        return {"connected": False, "error": f"Kapcsolódási hiba: {result.stderr.strip()[:100]}"}
+            return {"connected": True, "host": nas["host"], "share": nas["share"], "mode": "smb"}
+        return {"connected": False, "error": result.stderr.strip()[:100], "mode": "smb"}
     except subprocess.TimeoutExpired:
-        return {"connected": False, "error": "Időtúllépés - szerver nem elérhető"}
+        return {"connected": False, "error": "Időtúllépés", "mode": "smb"}
     except Exception as e:
-        return {"connected": False, "error": str(e)}
+        return {"connected": False, "error": str(e), "mode": "smb"}
 
 
-def _mount_smb() -> Optional[str]:
+def _check_ssh(config: dict) -> dict:
+    t = config["transfer"]
+    host = config["truenas"]["host"]
+    user = t.get("ssh_user", "root")
+    key = t.get("ssh_key_path", "")
+    port = t.get("ssh_port", 22)
+
+    if not key or not Path(key).exists():
+        return {"connected": False, "error": f"SSH kulcs nem található: {key}", "mode": "ssh"}
+
+    try:
+        cmd = [
+            "ssh", "-i", key, "-p", str(port),
+            "-o", "ConnectTimeout=5",
+            "-o", "StrictHostKeyChecking=accept-new",
+            "-o", "BatchMode=yes",
+            f"{user}@{host}", "echo ok",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            return {"connected": True, "host": host, "user": user, "mode": "ssh"}
+        return {"connected": False, "error": result.stderr.strip()[:100], "mode": "ssh"}
+    except subprocess.TimeoutExpired:
+        return {"connected": False, "error": "SSH időtúllépés", "mode": "ssh"}
+    except Exception as e:
+        return {"connected": False, "error": str(e), "mode": "ssh"}
+
+
+def _check_rsyncd(config: dict) -> dict:
+    t = config["transfer"]
+    host = config["truenas"]["host"]
+    module = t.get("rsyncd_module", "")
+    port = t.get("rsyncd_port", 873)
+
+    if not module:
+        return {"connected": False, "error": "rsyncd modul nincs megadva", "mode": "rsyncd"}
+
+    try:
+        cmd = ["rsync", "--port", str(port), "--list-only", f"rsync://{host}/{module}/"]
+        env = os.environ.copy()
+        pwd = t.get("rsyncd_password", "")
+        if pwd:
+            env["RSYNC_PASSWORD"] = pwd
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10, env=env)
+        if result.returncode == 0:
+            return {"connected": True, "host": host, "module": module, "mode": "rsyncd"}
+        return {"connected": False, "error": result.stderr.strip()[:100], "mode": "rsyncd"}
+    except subprocess.TimeoutExpired:
+        return {"connected": False, "error": "rsyncd időtúllépés", "mode": "rsyncd"}
+    except Exception as e:
+        return {"connected": False, "error": str(e), "mode": "rsyncd"}
+
+
+# ==================== SMB Mount (only for SMB mode) ====================
+
+
+def mount_smb() -> Optional[str]:
     config = load_config()
     nas = config["truenas"]
 
@@ -187,54 +253,104 @@ def _mount_smb() -> Optional[str]:
 
 def _is_mounted(path: str) -> bool:
     try:
-        result = subprocess.run(
-            ["mountpoint", "-q", path],
-            capture_output=True, timeout=5,
-        )
+        result = subprocess.run(["mountpoint", "-q", path], capture_output=True, timeout=5)
         return result.returncode == 0
     except Exception:
         return False
 
 
-def _run_transfer(job: TransferJob):
-    """Execute the transfer with retry logic and notifications."""
-    from app.discord_notify import (
-        notify_transfer_start,
-        notify_transfer_complete,
-        notify_transfer_error,
-    )
+# ==================== Rsync Destination Builders ====================
 
-    try:
-        job.started_at = time.time()
 
-        # Mount SMB
-        job.status = TransferStatus.MOUNTING
-        mount_point = _mount_smb()
-        if not mount_point:
-            job.status = TransferStatus.FAILED
-            job.error = "Nem sikerült csatlakozni a TrueNAS-hoz (SMB mount hiba)"
-            notify_transfer_error(job.id, job.error, 0, job.files_total)
-            return
+def _build_rsync_dest(config: dict, destination: str) -> tuple[list[str], str, dict]:
+    """Build rsync command prefix, destination string, and env based on mode.
 
-        if job.status == TransferStatus.CANCELLED:
-            return
+    Returns: (extra_rsync_args, rsync_destination_path, env_dict)
+    """
+    mode = config["transfer"].get("mode", "ssh")
+    t = config["transfer"]
+    host = config["truenas"]["host"]
 
-        # Prepare destination
-        config = load_config()
+    env = os.environ.copy()
+
+    if mode == "ssh":
+        user = t.get("ssh_user", "root")
+        key = t.get("ssh_key_path", "/root/.ssh/id_ed25519")
+        port = t.get("ssh_port", 22)
+        remote_base = t.get("ssh_remote_path", "").rstrip("/")
+        dest_subpath = destination.strip("/")
+
+        remote_path = remote_base
+        if dest_subpath:
+            remote_path = f"{remote_base}/{dest_subpath}"
+
+        ssh_cmd = f"ssh -i {key} -p {port} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+        extra_args = ["-e", ssh_cmd]
+        rsync_dest = f"{user}@{host}:{remote_path}/"
+        return extra_args, rsync_dest, env
+
+    elif mode == "rsyncd":
+        module = t.get("rsyncd_module", "")
+        port = t.get("rsyncd_port", 873)
+        dest_subpath = destination.strip("/")
+
+        rsync_dest = f"rsync://{host}:{port}/{module}/"
+        if dest_subpath:
+            rsync_dest = f"rsync://{host}:{port}/{module}/{dest_subpath}/"
+
+        pwd = t.get("rsyncd_password", "")
+        if pwd:
+            env["RSYNC_PASSWORD"] = pwd
+
+        return [], rsync_dest, env
+
+    elif mode == "smb":
+        # SMB: rsync to local mount point
         nas_base_path = config["truenas"].get("path", "/").strip("/")
-        dest_subpath = job.destination.strip("/")
+        dest_subpath = destination.strip("/")
 
-        dest_dir = Path(mount_point)
+        dest_dir = Path(SMB_MOUNT_POINT)
         if nas_base_path:
             dest_dir = dest_dir / nas_base_path
         if dest_subpath:
             dest_dir = dest_dir / dest_subpath
         dest_dir.mkdir(parents=True, exist_ok=True)
 
-        # Discord: transfer start
-        notify_transfer_start(
-            job.id, job.files_total, job.total_bytes, job.destination
-        )
+        return [], str(dest_dir) + "/", env
+
+    return [], "", env
+
+
+# ==================== Transfer Execution ====================
+
+
+def _run_transfer(job: TransferJob):
+    from app.discord_notify import (
+        notify_transfer_start, notify_transfer_complete, notify_transfer_error,
+    )
+
+    try:
+        job.started_at = time.time()
+        config = load_config()
+        mode = config["transfer"].get("mode", "ssh")
+
+        # SMB mode: mount first
+        if mode == "smb":
+            job.status = TransferStatus.MOUNTING
+            if not mount_smb():
+                job.status = TransferStatus.FAILED
+                job.error = "Nem sikerült csatlakozni a TrueNAS-hoz (SMB mount hiba)"
+                notify_transfer_error(job.id, job.error, 0, job.files_total)
+                return
+
+        if job.status == TransferStatus.CANCELLED:
+            return
+
+        # Build rsync destination
+        extra_args, rsync_dest, rsync_env = _build_rsync_dest(config, job.destination)
+
+        # Notify start
+        notify_transfer_start(job.id, job.files_total, job.total_bytes, job.destination)
 
         # Transfer files
         job.status = TransferStatus.TRANSFERRING
@@ -252,15 +368,13 @@ def _run_transfer(job: TransferJob):
             job.current_file = source_path.name
             job.files_done = i
 
-            # rsync with retry
-            success = _rsync_with_retry(job, str(source_path), str(dest_dir))
+            success = _rsync_with_retry(
+                job, str(source_path), rsync_dest, extra_args, rsync_env
+            )
 
             if success:
-                # Mark as archived
                 stat = source_path.stat()
-                mark_archived(
-                    source_path.name, stat.st_size, stat.st_mtime, job.destination
-                )
+                mark_archived(source_path.name, stat.st_size, stat.st_mtime, job.destination)
                 bytes_before += file_size
                 job.bytes_transferred = bytes_before
             elif job.status != TransferStatus.CANCELLED:
@@ -292,17 +406,17 @@ def _run_transfer(job: TransferJob):
         notify_transfer_error(job.id, job.error, job.files_done, job.files_total)
 
 
-def _rsync_with_retry(job: TransferJob, source: str, dest_dir: str) -> bool:
-    """Rsync a single file with automatic retry on failure."""
+def _rsync_with_retry(job, source, rsync_dest, extra_args, rsync_env) -> bool:
     config = load_config()
     max_retries = config["transfer"].get("retry_attempts", 5)
     retry_delay = config["transfer"].get("retry_delay", 3)
+    mode = config["transfer"].get("mode", "ssh")
 
     for attempt in range(max_retries + 1):
         if job.status == TransferStatus.CANCELLED:
             return False
 
-        success = _rsync_file(job, source, dest_dir)
+        success = _rsync_file(job, source, rsync_dest, extra_args, rsync_env)
         if success:
             return True
 
@@ -311,25 +425,22 @@ def _rsync_with_retry(job: TransferJob, source: str, dest_dir: str) -> bool:
             job.error = f"Újrapróbálkozás ({attempt + 1}/{max_retries})..."
             print(f"Retry {attempt + 1}/{max_retries} for {source}, waiting {retry_delay}s")
 
-            # Wait, but check for cancellation
             for _ in range(retry_delay):
                 if job.status == TransferStatus.CANCELLED:
                     return False
                 time.sleep(1)
 
-            # Re-check SMB mount (might have disconnected)
-            if not _is_mounted(SMB_MOUNT_POINT):
+            # SMB: re-check mount
+            if mode == "smb" and not _is_mounted(SMB_MOUNT_POINT):
                 print("SMB disconnected, remounting...")
-                mount_point = _mount_smb()
-                if not mount_point:
+                if not mount_smb():
                     job.error = "NAS kapcsolat megszakadt, újracsatlakozás sikertelen"
                     return False
 
     return False
 
 
-def _rsync_file(job: TransferJob, source: str, dest_dir: str) -> bool:
-    """Rsync a single file with progress tracking and Discord notifications."""
+def _rsync_file(job, source, rsync_dest, extra_args, rsync_env) -> bool:
     from app.discord_notify import notify_transfer_progress
 
     config = load_config()
@@ -353,20 +464,19 @@ def _rsync_file(job: TransferJob, source: str, dest_dir: str) -> bool:
     if bw_limit > 0:
         cmd.extend(["--bwlimit", str(bw_limit)])
 
-    cmd.extend([source, dest_dir + "/"])
+    # Add mode-specific args (e.g. -e ssh for SSH mode)
+    cmd.extend(extra_args)
+
+    # Source file, then destination
+    cmd.extend([source, rsync_dest])
 
     try:
         proc = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            bufsize=1,
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, bufsize=1, env=rsync_env,
         )
 
-        progress_re = re.compile(
-            r"[\d,]+\s+(\d+)%\s+([\d.]+\w+/s)\s+([\d:]+)"
-        )
+        progress_re = re.compile(r"[\d,]+\s+(\d+)%\s+([\d.]+\w+/s)\s+([\d:]+)")
 
         for line in iter(proc.stdout.readline, ""):
             if job.status == TransferStatus.CANCELLED:
@@ -383,12 +493,10 @@ def _rsync_file(job: TransferJob, source: str, dest_dir: str) -> bool:
                 job.speed = match.group(2)
                 job.eta = match.group(3)
 
-                # Calculate average speed
                 elapsed = time.time() - job.started_at
                 if elapsed > 0 and job.bytes_transferred > 0:
                     job.avg_speed = job.bytes_transferred / elapsed
 
-                # Discord progress notification at configured intervals
                 pct_bucket = int(overall_pct // notify_interval) * notify_interval
                 if pct_bucket > 0 and pct_bucket != job._last_notified_pct:
                     job._last_notified_pct = pct_bucket

@@ -18,11 +18,21 @@ DEFAULT_CONFIG = {
         "password": "",
     },
     "transfer": {
+        "mode": "ssh",  # "smb", "ssh", "rsyncd"
         "default_destination": "/",
         "bandwidth_limit": 0,
         "partial_transfer": True,
         "retry_attempts": 5,
         "retry_delay": 3,
+        # SSH mode settings
+        "ssh_user": "root",
+        "ssh_key_path": "/root/.ssh/id_ed25519",
+        "ssh_port": 22,
+        "ssh_remote_path": "",  # e.g. /mnt/pool/archiv
+        # rsyncd mode settings
+        "rsyncd_module": "",  # e.g. "archiv"
+        "rsyncd_port": 873,
+        "rsyncd_password": "",
     },
     "filters": {
         "default_filter": "all",
@@ -107,9 +117,6 @@ def _deep_merge(default: dict, override: dict) -> dict:
 
 
 def load_archive() -> dict:
-    """Load archive database.
-    Format: { "fingerprint": { name, size, mtime, archived_at, destination } }
-    """
     if ARCHIVE_FILE.exists():
         try:
             with open(ARCHIVE_FILE, "r") as f:
@@ -131,7 +138,6 @@ def save_archive(archive: dict) -> bool:
 
 
 def file_fingerprint(name: str, size: int, mtime: float) -> str:
-    """Unique fingerprint: name + size + modification time."""
     return f"{name}|{size}|{int(mtime)}"
 
 

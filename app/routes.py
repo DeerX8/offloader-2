@@ -8,7 +8,7 @@ from app.config import (
 )
 from app.storage import detect_usb_devices, list_files, mount_device, unmount_device
 from app.transfer import (
-    cancel_transfer, check_smb_connection,
+    cancel_transfer, check_connection,
     get_transfer, get_transfers, start_transfer,
 )
 from app.speedtest import get_speedtest_state, start_speedtest
@@ -21,8 +21,7 @@ api = Blueprint("api", __name__, url_prefix="/api")
 
 @api.route("/devices")
 def api_devices():
-    devices = detect_usb_devices()
-    return jsonify({"devices": devices})
+    return jsonify({"devices": detect_usb_devices()})
 
 
 @api.route("/devices/mount", methods=["POST"])
@@ -59,8 +58,7 @@ def api_files():
         return jsonify({"error": "Nincs megadva mount pont"}), 400
     config = load_config()
     custom_ext = config["filters"].get("custom_extensions", [])
-    result = list_files(mount_point, path, filter_type, custom_ext)
-    return jsonify(result)
+    return jsonify(list_files(mount_point, path, filter_type, custom_ext))
 
 
 # --- Transfers ---
@@ -82,7 +80,6 @@ def api_start_transfer():
     if not destination:
         destination = config["transfer"].get("default_destination", "/")
 
-    # If sizes not provided, estimate zeros
     if len(sizes) != len(files):
         sizes = [0] * len(files)
 
@@ -114,14 +111,13 @@ def api_cancel_transfer(job_id):
 
 @api.route("/nas/status")
 def api_nas_status():
-    return jsonify(check_smb_connection())
+    return jsonify(check_connection())
 
 
 # --- Speedtest ---
 
 @api.route("/speedtest", methods=["POST"])
-def api_speedtest():
-    """Start a speedtest. Optionally pass total_pending_bytes for ETA calc."""
+def api_speedtest_start():
     data = request.get_json() or {}
     pending = data.get("total_pending_bytes", 0)
     if start_speedtest(pending):
@@ -156,8 +152,35 @@ def api_discord_test():
     url = data.get("webhook_url", "")
     if not url:
         return jsonify({"error": "Nincs megadva webhook URL"}), 400
-    result = test_webhook(url)
-    return jsonify(result)
+    return jsonify(test_webhook(url))
+
+
+# --- SSH Key Setup Helper ---
+
+@api.route("/ssh/keygen", methods=["POST"])
+def api_ssh_keygen():
+    """Generate SSH key pair if not exists, return public key."""
+    import subprocess
+    config = load_config()
+    key_path = config["transfer"].get("ssh_key_path", "/root/.ssh/id_ed25519")
+
+    if not Path(key_path).exists():
+        try:
+            from pathlib import Path as P
+            P(key_path).parent.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["ssh-keygen", "-t", "ed25519", "-f", key_path, "-N", ""],
+                capture_output=True, text=True, timeout=10,
+            )
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    try:
+        from pathlib import Path as P
+        pub_key = P(f"{key_path}.pub").read_text().strip()
+        return jsonify({"public_key": pub_key, "key_path": key_path})
+    except FileNotFoundError:
+        return jsonify({"error": "Kulcs generálás sikertelen"}), 500
 
 
 # --- Settings ---
@@ -166,8 +189,11 @@ def api_discord_test():
 def api_get_settings():
     config = load_config()
     safe_config = config.copy()
+    # Mask passwords
     if safe_config.get("truenas", {}).get("password"):
         safe_config["truenas"]["password"] = "••••••••"
+    if safe_config.get("transfer", {}).get("rsyncd_password"):
+        safe_config["transfer"]["rsyncd_password"] = "••••••••"
     safe_config["filter_presets"] = {
         k: {"label": v["label"], "count": len(v["extensions"])}
         for k, v in FILTER_PRESETS.items()
@@ -188,10 +214,14 @@ def api_save_settings():
             config["truenas"]["password"] = data["truenas"]["password"]
 
     if "transfer" in data:
-        for key in ("default_destination", "bandwidth_limit", "partial_transfer",
-                     "retry_attempts", "retry_delay"):
+        for key in ("mode", "default_destination", "bandwidth_limit",
+                     "partial_transfer", "retry_attempts", "retry_delay",
+                     "ssh_user", "ssh_key_path", "ssh_port", "ssh_remote_path",
+                     "rsyncd_module", "rsyncd_port"):
             if key in data["transfer"]:
                 config["transfer"][key] = data["transfer"][key]
+        if "rsyncd_password" in data["transfer"] and data["transfer"]["rsyncd_password"] != "••••••••":
+            config["transfer"]["rsyncd_password"] = data["transfer"]["rsyncd_password"]
 
     if "filters" in data:
         for key in ("default_filter", "custom_extensions"):
@@ -208,3 +238,6 @@ def api_save_settings():
     if save_config(config):
         return jsonify({"saved": True})
     return jsonify({"error": "Nem sikerült menteni"}), 500
+
+
+from pathlib import Path

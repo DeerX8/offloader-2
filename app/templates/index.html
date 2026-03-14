@@ -85,43 +85,47 @@
         .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
                          border-radius: 50%; background: white; transition: transform 0.2s; }
         .toggle.on::after { transform: translateX(20px); }
+        .mode-option { padding: 10px 14px; border-radius: 8px; border: 2px solid var(--border);
+                       cursor: pointer; transition: all 0.15s; text-align: center; }
+        .mode-option.active { border-color: var(--accent); background: rgba(59,130,246,0.1); }
+        .mode-option .mode-title { font-weight: 700; font-size: 14px; }
+        .mode-option .mode-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+        .code-block { background: var(--bg); border-radius: 6px; padding: 8px 12px; font-family: monospace;
+                      font-size: 12px; word-break: break-all; border: 1px solid var(--border); }
     </style>
 </head>
 <body class="h-full flex flex-col">
 
-<!-- Header -->
 <header class="flex items-center justify-between px-4 py-3" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
     <h1 class="text-lg font-bold">📦 Pi Archiver</h1>
     <div class="flex items-center gap-3">
-        <div id="nas-indicator" class="flex items-center gap-1.5 text-xs" style="color:var(--text-dim);">
+        <span id="mode-badge" class="badge badge-blue">—</span>
+        <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-dim);">
             <span id="nas-dot" style="width:8px;height:8px;border-radius:50%;background:var(--border);"></span>
             <span id="nas-label">NAS</span>
         </div>
     </div>
 </header>
 
-<!-- Tab Navigation -->
 <nav class="flex px-4" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
     <div class="tab active" data-tab="files" onclick="switchTab('files')">📂 Fájlok</div>
     <div class="tab" data-tab="transfers" onclick="switchTab('transfers')">📤 Átvitel</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Beállítás</div>
 </nav>
 
-<!-- Content Area -->
 <main class="flex-1 overflow-y-auto">
 
 <!-- ==================== FILES TAB ==================== -->
 <div id="tab-files" class="fade-in">
-    <!-- Device + Filter -->
     <div class="px-4 py-3" style="border-bottom:1px solid rgba(71,85,105,0.2);">
         <div class="flex items-center gap-2 mb-2">
-            <select id="device-select" onchange="onDeviceChange()" style="flex:1;">
+            <select id="device-select" onchange="onDeviceChange()" style="flex:1;" autocomplete="off">
                 <option value="">💾 USB eszköz keresése...</option>
             </select>
-            <button class="btn btn-outline btn-sm" onclick="refreshDevices()" title="Frissítés">🔄</button>
+            <button class="btn btn-outline btn-sm" onclick="refreshDevices()">🔄</button>
         </div>
         <div class="flex items-center gap-2">
-            <select id="filter-select" onchange="onFilterChange()" style="flex:1;">
+            <select id="filter-select" onchange="onFilterChange()" style="flex:1;" autocomplete="off">
                 <option value="all">Minden fájl</option>
                 <option value="photo">📷 Fotók</option>
                 <option value="video">🎬 Videók</option>
@@ -131,19 +135,15 @@
         </div>
     </div>
 
-    <!-- Breadcrumb -->
     <div id="breadcrumb" class="px-4 py-2 flex items-center gap-1 text-sm overflow-x-auto" style="color:var(--text-dim);white-space:nowrap;"></div>
 
-    <!-- File List -->
     <div id="file-list" class="pb-20">
         <div class="px-4 py-8 text-center" style="color:var(--text-dim);">
             <p class="text-lg mb-2">💾</p>
             <p>Csatlakoztass egy USB meghajtót</p>
-            <p class="text-sm mt-1">Automatikusan felismeri az eszközt</p>
         </div>
     </div>
 
-    <!-- Transfer Bar -->
     <div id="transfer-bar" class="bottom-bar hidden" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-card);border-top:1px solid rgba(71,85,105,0.3);padding:12px 16px;z-index:50;">
         <div class="flex items-center justify-between">
             <div>
@@ -152,7 +152,7 @@
             </div>
             <div class="flex gap-2">
                 <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕</button>
-                <button class="btn btn-warning btn-sm" onclick="runSpeedtest()">🏎️ Teszt</button>
+                <button class="btn btn-warning btn-sm" onclick="runSpeedtest()">🏎️</button>
                 <button class="btn btn-primary btn-sm" onclick="startTransferFromSelection()">📤 Másolás</button>
             </div>
         </div>
@@ -161,7 +161,6 @@
 
 <!-- ==================== TRANSFERS TAB ==================== -->
 <div id="tab-transfers" class="hidden fade-in">
-    <!-- Speedtest Card -->
     <div id="speedtest-card" class="mx-4 mt-4 card p-3 hidden">
         <div class="flex items-center justify-between mb-2">
             <span class="font-bold text-sm">🏎️ Speedtest</span>
@@ -172,45 +171,120 @@
         </div>
         <div id="speedtest-result" class="text-sm" style="color:var(--text-dim);"></div>
     </div>
-
     <div id="transfers-list" class="px-4 py-4">
         <div class="text-center py-8" style="color:var(--text-dim);">
-            <p class="text-lg mb-2">📤</p>
-            <p>Még nincs átvitel</p>
+            <p class="text-lg mb-2">📤</p><p>Még nincs átvitel</p>
         </div>
     </div>
 </div>
 
 <!-- ==================== SETTINGS TAB ==================== -->
 <div id="tab-settings" class="hidden fade-in p-4 space-y-4 pb-8">
-    <!-- TrueNAS -->
+
+    <!-- TrueNAS Host -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">🖥️ TrueNAS szerver</h3>
-        <div class="space-y-3">
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Szerver cím (Tailscale IP)</label>
-                <input id="s-host" type="text" placeholder="pl. 100.x.x.x">
+        <div>
+            <label class="text-xs mb-1 block" style="color:var(--text-dim);">Szerver cím (Tailscale IP)</label>
+            <input id="s-host" type="text" placeholder="pl. 100.x.x.x" autocomplete="off">
+        </div>
+    </div>
+
+    <!-- Transfer Mode -->
+    <div class="card p-4">
+        <h3 class="font-bold mb-3">📡 Átviteli mód</h3>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+            <div class="mode-option" data-mode="ssh" onclick="selectMode('ssh')">
+                <div class="mode-title">SSH</div>
+                <div class="mode-desc">Legjobb mobilneten</div>
+            </div>
+            <div class="mode-option" data-mode="rsyncd" onclick="selectMode('rsyncd')">
+                <div class="mode-title">rsyncd</div>
+                <div class="mode-desc">Docker a NAS-on</div>
+            </div>
+            <div class="mode-option" data-mode="smb" onclick="selectMode('smb')">
+                <div class="mode-title">SMB</div>
+                <div class="mode-desc">Egyszerű, lassabb</div>
+            </div>
+        </div>
+
+        <!-- SSH Settings -->
+        <div id="mode-ssh" class="space-y-3 hidden">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH felhasználó</label>
+                    <input id="s-ssh-user" type="text" value="root" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH port</label>
+                    <input id="s-ssh-port" type="number" value="22" autocomplete="off">
+                </div>
             </div>
             <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH kulcs útvonal (a Pi-n)</label>
+                <input id="s-ssh-key" type="text" value="/root/.ssh/id_ed25519" autocomplete="off">
+            </div>
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Távoli útvonal a TrueNAS-on</label>
+                <input id="s-ssh-remote" type="text" placeholder="pl. /mnt/pool/archiv" autocomplete="off">
+            </div>
+            <div class="text-xs p-3 rounded-lg" style="background:var(--bg);color:var(--text-dim);">
+                <p class="font-bold mb-2">🔑 SSH kulcs beállítás:</p>
+                <button class="btn btn-outline btn-sm mb-2" onclick="generateSSHKey()">Kulcs generálása / megjelenítése</button>
+                <div id="ssh-pubkey" class="hidden">
+                    <p class="mb-1">Ezt a publikus kulcsot másold be a TrueNAS-ra:</p>
+                    <div id="ssh-pubkey-value" class="code-block"></div>
+                    <p class="mt-2">TrueNAS: Credentials → Local Users → [user] → SSH Public Key</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- rsyncd Settings -->
+        <div id="mode-rsyncd" class="space-y-3 hidden">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">rsyncd modul neve</label>
+                    <input id="s-rsyncd-module" type="text" placeholder="pl. archiv" autocomplete="off">
+                </div>
+                <div>
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Port</label>
+                    <input id="s-rsyncd-port" type="number" value="873" autocomplete="off">
+                </div>
+            </div>
+            <div>
+                <label class="text-xs mb-1 block" style="color:var(--text-dim);">rsyncd jelszó (opcionális)</label>
+                <input id="s-rsyncd-pass" type="text" autocomplete="off">
+            </div>
+            <div class="text-xs p-3 rounded-lg" style="background:var(--bg);color:var(--text-dim);">
+                <p class="font-bold mb-1">📦 TrueNAS Docker beállítás:</p>
+                <p>Indíts egy rsyncd konténert a TrueNAS-on, pl.:</p>
+                <div class="code-block mt-1">docker run -d --name rsyncd -p 873:873 -v /mnt/pool/archiv:/data axiom/rsync-server</div>
+            </div>
+        </div>
+
+        <!-- SMB Settings -->
+        <div id="mode-smb" class="space-y-3 hidden">
+            <div>
                 <label class="text-xs mb-1 block" style="color:var(--text-dim);">SMB share neve</label>
-                <input id="s-share" type="text" placeholder="pl. archiv">
+                <input id="s-share" type="text" placeholder="pl. archiv" autocomplete="off">
             </div>
             <div>
                 <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alap útvonal a share-en belül</label>
-                <input id="s-path" type="text" placeholder="pl. /Photos/2025">
+                <input id="s-path" type="text" placeholder="pl. /Photos/2025" autocomplete="off">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-xs mb-1 block" style="color:var(--text-dim);">Felhasználó</label>
-                    <input id="s-user" type="text" placeholder="username">
+                    <input id="s-user" type="text" placeholder="username" autocomplete="off">
                 </div>
                 <div>
                     <label class="text-xs mb-1 block" style="color:var(--text-dim);">Jelszó</label>
-                    <input id="s-pass" type="password" placeholder="••••••">
+                    <input id="s-pass" type="text" autocomplete="off" style="-webkit-text-security:disc;">
                 </div>
             </div>
-            <button class="btn btn-outline btn-sm" onclick="testNasConnection()">🔌 Kapcsolat tesztelése</button>
         </div>
+
+        <button class="btn btn-outline btn-sm mt-3" onclick="testConnection()">🔌 Kapcsolat tesztelése</button>
     </div>
 
     <!-- Transfer Settings -->
@@ -219,20 +293,20 @@
         <div class="space-y-3">
             <div>
                 <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alapértelmezett cél mappa</label>
-                <input id="s-dest" type="text" placeholder="pl. /Napi">
+                <input id="s-dest" type="text" placeholder="pl. /Napi" autocomplete="off">
             </div>
             <div>
                 <label class="text-xs mb-1 block" style="color:var(--text-dim);">Sávszélesség limit (KB/s, 0 = korlátlan)</label>
-                <input id="s-bwlimit" type="number" value="0" min="0">
+                <input id="s-bwlimit" type="number" value="0" min="0" autocomplete="off">
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="text-xs mb-1 block" style="color:var(--text-dim);">Újrapróbálkozás (db)</label>
-                    <input id="s-retry" type="number" value="5" min="0" max="20">
+                    <input id="s-retry" type="number" value="5" min="0" max="20" autocomplete="off">
                 </div>
                 <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Várakozás retry közt (mp)</label>
-                    <input id="s-retry-delay" type="number" value="3" min="1" max="30">
+                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Retry közt (mp)</label>
+                    <input id="s-retry-delay" type="number" value="3" min="1" max="30" autocomplete="off">
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -244,7 +318,7 @@
 
     <!-- Discord -->
     <div class="card p-4">
-        <h3 class="font-bold mb-3">💬 Discord értesítések</h3>
+        <h3 class="font-bold mb-3">💬 Discord</h3>
         <div class="space-y-3">
             <div class="flex items-center justify-between">
                 <span class="text-sm">Discord értesítések</span>
@@ -253,63 +327,48 @@
             <div id="discord-settings" class="space-y-3 hidden">
                 <div>
                     <label class="text-xs mb-1 block" style="color:var(--text-dim);">Webhook URL</label>
-                    <input id="s-discord-url" type="text" placeholder="https://discord.com/api/webhooks/...">
+                    <input id="s-discord-url" type="text" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
                 </div>
-                <div class="flex gap-2">
-                    <button class="btn btn-outline btn-sm" onclick="testDiscord()">🔔 Teszt küldése</button>
-                </div>
+                <button class="btn btn-outline btn-sm" onclick="testDiscord()">🔔 Teszt</button>
                 <div>
                     <label class="text-xs mb-1 block" style="color:var(--text-dim);">Értesítés gyakorisága (%)</label>
-                    <select id="s-notify-interval">
-                        <option value="5">Minden 5%-nál</option>
-                        <option value="10" selected>Minden 10%-nál</option>
-                        <option value="25">Minden 25%-nál</option>
-                        <option value="50">50%-nál és végén</option>
+                    <select id="s-notify-interval" autocomplete="off">
+                        <option value="5">Minden 5%</option>
+                        <option value="10" selected>Minden 10%</option>
+                        <option value="25">Minden 25%</option>
+                        <option value="50">50% és végén</option>
                     </select>
                 </div>
                 <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2">
-                        <input id="s-notify-start" type="checkbox" checked style="width:auto;"> Indításkor
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input id="s-notify-complete" type="checkbox" checked style="width:auto;"> Befejezéskor
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input id="s-notify-error" type="checkbox" checked style="width:auto;"> Hiba esetén
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input id="s-notify-speedtest" type="checkbox" checked style="width:auto;"> Speedtest után
-                    </label>
+                    <label class="flex items-center gap-2"><input id="s-notify-start" type="checkbox" checked style="width:auto;"> Indításkor</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-complete" type="checkbox" checked style="width:auto;"> Befejezéskor</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-error" type="checkbox" checked style="width:auto;"> Hiba esetén</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-speedtest" type="checkbox" checked style="width:auto;"> Speedtest után</label>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Archive Stats -->
+    <!-- Archive -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">📋 Archiválási napló</h3>
         <div id="archive-stats" class="text-sm mb-3" style="color:var(--text-dim);">Betöltés...</div>
         <button class="btn btn-danger btn-sm" onclick="clearArchive()">🗑️ Napló törlése</button>
     </div>
 
-    <!-- Save -->
     <button class="btn btn-primary w-full" onclick="saveSettings()">💾 Beállítások mentése</button>
 </div>
 
 </main>
 
 <script>
-// ==================== State ====================
 let state = {
-    currentMount: null,
-    currentPath: '/',
-    filter: 'photo_video',
-    selectedFiles: new Map(),
-    pollInterval: null,
-    speedtestPoll: null,
+    currentMount: null, currentPath: '/', filter: 'photo_video',
+    selectedFiles: new Map(), pollInterval: null, speedtestPoll: null,
+    transferMode: 'ssh',
 };
 
-// ==================== Tab Navigation ====================
+// ==================== Tabs ====================
 function switchTab(tab) {
     document.querySelectorAll('[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
     document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.toggle('hidden', el.id !== `tab-${tab}`));
@@ -319,92 +378,58 @@ function switchTab(tab) {
 
 // ==================== Toast ====================
 function toast(msg, type = 'info') {
-    const colors = { info: 'var(--accent)', success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)' };
+    const c = { info: 'var(--accent)', success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)' };
     const el = document.createElement('div');
-    el.className = 'toast';
-    el.style.background = colors[type] || colors.info;
-    el.style.color = 'white';
-    el.textContent = msg;
+    el.className = 'toast'; el.style.background = c[type] || c.info; el.style.color = 'white'; el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3000);
 }
 
-// ==================== API helpers ====================
+// ==================== API ====================
 async function api(endpoint, opts = {}) {
     try {
         const res = await fetch(`/api${endpoint}`, {
             headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-            ...opts,
-            body: opts.body ? JSON.stringify(opts.body) : undefined,
+            ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined,
         });
         return await res.json();
-    } catch (e) {
-        console.error('API error:', e);
-        return { error: 'Hálózati hiba – ellenőrizd a kapcsolatot' };
-    }
+    } catch (e) { return { error: 'Hálózati hiba' }; }
 }
 
-// ==================== USB Devices ====================
+// ==================== USB ====================
 async function refreshDevices() {
     const sel = document.getElementById('device-select');
-    const prev = sel.value;
     sel.innerHTML = '<option value="">⏳ Keresés...</option>';
-
     const data = await api('/devices');
     sel.innerHTML = '<option value="">💾 Válassz USB eszközt</option>';
-
-    if (data.devices && data.devices.length > 0) {
+    if (data.devices?.length > 0) {
         data.devices.forEach(dev => {
             const opt = document.createElement('option');
             opt.value = JSON.stringify(dev);
-            const label = dev.label || dev.device;
-            const status = dev.mounted ? ' ✅' : '';
-            opt.textContent = `${label} (${dev.size}, ${dev.filesystem})${status}`;
+            opt.textContent = `${dev.label || dev.device} (${dev.size}, ${dev.filesystem})${dev.mounted ? ' ✅' : ''}`;
             sel.appendChild(opt);
         });
-        if (data.devices.length === 1 && !state.currentMount) {
-            sel.selectedIndex = 1;
-            onDeviceChange();
-        }
-    } else {
-        sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>';
-    }
+        if (data.devices.length === 1 && !state.currentMount) { sel.selectedIndex = 1; onDeviceChange(); }
+    } else { sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>'; }
 }
 
 async function onDeviceChange() {
     const sel = document.getElementById('device-select');
     if (!sel.value) return;
     const dev = JSON.parse(sel.value);
-
-    if (dev.mounted && dev.mountpoint) {
-        state.currentMount = dev.mountpoint;
-        state.currentPath = '/';
-        loadFiles();
-        return;
-    }
-
+    if (dev.mounted && dev.mountpoint) { state.currentMount = dev.mountpoint; state.currentPath = '/'; loadFiles(); return; }
     const data = await api('/devices/mount', { method: 'POST', body: { device: dev.device } });
-    if (data.mounted) {
-        state.currentMount = data.mountpoint;
-        state.currentPath = '/';
-        toast('Eszköz csatlakoztatva', 'success');
-        loadFiles();
-    } else {
-        toast(data.error || 'Mount hiba', 'error');
-    }
+    if (data.mounted) { state.currentMount = data.mountpoint; state.currentPath = '/'; toast('Csatlakoztatva', 'success'); loadFiles(); }
+    else toast(data.error || 'Mount hiba', 'error');
 }
 
-// ==================== File Browser ====================
+// ==================== Files ====================
 async function loadFiles() {
     if (!state.currentMount) return;
-    const listEl = document.getElementById('file-list');
-    listEl.innerHTML = '<div class="px-4 py-8 text-center"><div class="spinner mx-auto"></div></div>';
-
+    const el = document.getElementById('file-list');
+    el.innerHTML = '<div class="px-4 py-8 text-center"><div class="spinner mx-auto"></div></div>';
     const data = await api(`/files?mount=${encodeURIComponent(state.currentMount)}&path=${encodeURIComponent(state.currentPath)}&filter=${state.filter}`);
-    if (data.error) {
-        listEl.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--danger);">❌ ${data.error}</div>`;
-        return;
-    }
+    if (data.error) { el.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--danger);">❌ ${data.error}</div>`; return; }
     renderBreadcrumb(data.current_path || '/');
     renderFileList(data);
 }
@@ -413,150 +438,81 @@ function renderBreadcrumb(path) {
     const el = document.getElementById('breadcrumb');
     const parts = path.split('/').filter(Boolean);
     let html = `<span class="cursor-pointer" onclick="navigateTo('/')" style="color:var(--accent);">🏠</span>`;
-    let accumulated = '';
-    parts.forEach((part, i) => {
-        accumulated += '/' + part;
-        const p = accumulated;
+    let acc = '';
+    parts.forEach((p, i) => {
+        acc += '/' + p;
         html += ` <span style="color:var(--border);">/</span> `;
-        if (i === parts.length - 1) {
-            html += `<span class="font-medium">${part}</span>`;
-        } else {
-            html += `<span class="cursor-pointer" onclick="navigateTo('${p}')" style="color:var(--accent);">${part}</span>`;
-        }
+        html += i === parts.length - 1 ? `<span class="font-medium">${p}</span>` :
+            `<span class="cursor-pointer" onclick="navigateTo('${acc}')" style="color:var(--accent);">${p}</span>`;
     });
     el.innerHTML = html;
 }
 
 function renderFileList(data) {
-    const listEl = document.getElementById('file-list');
-    const countEl = document.getElementById('file-count');
-    const archivedNote = data.archived_count > 0 ? ` (${data.archived_count} ✅)` : '';
-    countEl.textContent = `${data.total_files || 0} fájl${archivedNote}`;
-
-    if (!data.directories.length && !data.files.length) {
-        listEl.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--text-dim);">📭 Üres mappa</div>`;
-        return;
-    }
-
+    const el = document.getElementById('file-list');
+    const arc = data.archived_count > 0 ? ` (${data.archived_count} ✅)` : '';
+    document.getElementById('file-count').textContent = `${data.total_files || 0} fájl${arc}`;
+    if (!data.directories.length && !data.files.length) { el.innerHTML = '<div class="px-4 py-8 text-center" style="color:var(--text-dim);">📭 Üres</div>'; return; }
     let html = '';
-
-    data.directories.forEach(dir => {
-        html += `
-        <div class="file-item" onclick="navigateTo('${dir.path}')">
+    data.directories.forEach(d => {
+        html += `<div class="file-item" onclick="navigateTo('${d.path}')">
             <span style="font-size:22px;">📁</span>
-            <div style="flex:1;min-width:0;">
-                <div class="font-medium truncate">${dir.name}</div>
-                <div class="text-xs" style="color:var(--text-dim);">${dir.items} elem</div>
-            </div>
-            <span style="color:var(--text-dim);">›</span>
-        </div>`;
+            <div style="flex:1;min-width:0;"><div class="font-medium truncate">${d.name}</div><div class="text-xs" style="color:var(--text-dim);">${d.items} elem</div></div>
+            <span style="color:var(--text-dim);">›</span></div>`;
     });
-
-    data.files.forEach(file => {
-        const fullPath = `${state.currentMount}/${file.path}`;
-        const selected = state.selectedFiles.has(fullPath);
-        const icon = getFileIcon(file.extension);
-        const archivedClass = file.archived ? ' archived-item' : '';
-        const archivedBadge = file.archived ? '<span class="badge badge-archived ml-1">✅ Archived</span>' : '';
-
-        html += `
-        <div class="file-item${archivedClass} ${selected ? 'selected' : ''}" onclick="toggleFile('${fullPath}', '${escHtml(file.name)}', ${file.size}, ${file.modified})">
-            <div class="checkbox ${selected ? 'checked' : ''}"></div>
-            <span style="font-size:20px;">${icon}</span>
-            <div style="flex:1;min-width:0;">
-                <div class="text-sm font-medium truncate">${escHtml(file.name)}${archivedBadge}</div>
-                <div class="text-xs" style="color:var(--text-dim);">${file.size_human}</div>
-            </div>
-        </div>`;
+    data.files.forEach(f => {
+        const fp = `${state.currentMount}/${f.path}`;
+        const sel = state.selectedFiles.has(fp);
+        const ab = f.archived ? '<span class="badge badge-archived ml-1">✅</span>' : '';
+        html += `<div class="file-item${f.archived ? ' archived-item' : ''} ${sel ? 'selected' : ''}" onclick="toggleFile('${fp}','${esc(f.name)}',${f.size},${f.modified})">
+            <div class="checkbox ${sel ? 'checked' : ''}"></div>
+            <span style="font-size:20px;">${fileIcon(f.extension)}</span>
+            <div style="flex:1;min-width:0;"><div class="text-sm font-medium truncate">${esc(f.name)}${ab}</div><div class="text-xs" style="color:var(--text-dim);">${f.size_human}</div></div></div>`;
     });
-
-    listEl.innerHTML = html;
+    el.innerHTML = html;
 }
 
-function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
-
-function getFileIcon(ext) {
-    const m = {
-        '.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.heic':'🖼️','.heif':'🖼️','.tiff':'🖼️','.tif':'🖼️',
-        '.raw':'📸','.cr2':'📸','.cr3':'📸','.nef':'📸','.arw':'📸','.orf':'📸','.rw2':'📸','.dng':'📸',
-        '.mp4':'🎬','.mov':'🎬','.avi':'🎬','.mkv':'🎬','.mts':'🎬','.m2ts':'🎬','.mxf':'🎬','.braw':'🎬',
-    };
-    return m[ext] || '📄';
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
+function fileIcon(e) {
+    const m = {'.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.heic':'🖼️','.heif':'🖼️','.tiff':'🖼️','.tif':'🖼️','.raw':'📸','.cr2':'📸','.cr3':'📸','.nef':'📸','.arw':'📸','.orf':'📸','.rw2':'📸','.dng':'📸','.mp4':'🎬','.mov':'🎬','.avi':'🎬','.mkv':'🎬','.mts':'🎬','.m2ts':'🎬','.mxf':'🎬','.braw':'🎬'};
+    return m[e] || '📄';
 }
-
-function navigateTo(path) { state.currentPath = path; loadFiles(); }
+function navigateTo(p) { state.currentPath = p; loadFiles(); }
 function onFilterChange() { state.filter = document.getElementById('filter-select').value; loadFiles(); }
 
-// ==================== File Selection ====================
-function toggleFile(fullPath, name, size, mtime) {
-    if (state.selectedFiles.has(fullPath)) {
-        state.selectedFiles.delete(fullPath);
-    } else {
-        state.selectedFiles.set(fullPath, { name, size, fullPath, mtime });
-    }
-    updateSelectionUI();
-    loadFiles();
+// ==================== Selection ====================
+function toggleFile(fp, name, size, mt) {
+    state.selectedFiles.has(fp) ? state.selectedFiles.delete(fp) : state.selectedFiles.set(fp, {name,size,fullPath:fp,mtime:mt});
+    updateSelectionUI(); loadFiles();
 }
-
 function clearSelection() { state.selectedFiles.clear(); updateSelectionUI(); loadFiles(); }
-
 function updateSelectionUI() {
     const bar = document.getElementById('transfer-bar');
-    const count = state.selectedFiles.size;
-    if (count > 0) {
-        bar.classList.remove('hidden');
-        document.getElementById('selected-count').textContent = count;
-        const totalBytes = Array.from(state.selectedFiles.values()).reduce((s, f) => s + f.size, 0);
-        document.getElementById('selected-size').textContent = `(${humanSize(totalBytes)})`;
-    } else {
-        bar.classList.add('hidden');
-    }
+    const n = state.selectedFiles.size;
+    if (n > 0) { bar.classList.remove('hidden'); document.getElementById('selected-count').textContent = n;
+        document.getElementById('selected-size').textContent = `(${humanSize(Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0))})`; }
+    else bar.classList.add('hidden');
 }
-
-function humanSize(bytes) {
-    const u = ['B','KB','MB','GB','TB'];
-    let i = 0;
-    while (bytes >= 1024 && i < u.length - 1) { bytes /= 1024; i++; }
-    return `${bytes.toFixed(i === 0 ? 0 : 1)} ${u[i]}`;
-}
+function humanSize(b) { const u=['B','KB','MB','GB','TB']; let i=0; while(b>=1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i===0?0:1)} ${u[i]}`; }
 
 // ==================== Speedtest ====================
 async function runSpeedtest() {
-    const totalBytes = Array.from(state.selectedFiles.values()).reduce((s, f) => s + f.size, 0);
-
-    const data = await api('/speedtest', {
-        method: 'POST',
-        body: { total_pending_bytes: totalBytes },
-    });
-    if (data.error) { toast(data.error, 'error'); return; }
-
-    toast('Speedtest indítva...', 'info');
-    switchTab('transfers');
-
-    const card = document.getElementById('speedtest-card');
-    card.classList.remove('hidden');
+    const tb = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+    const d = await api('/speedtest', { method:'POST', body:{total_pending_bytes:tb} });
+    if (d.error) { toast(d.error,'error'); return; }
+    toast('Speedtest...','info'); switchTab('transfers');
+    document.getElementById('speedtest-card').classList.remove('hidden');
     document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-yellow">Fut...</span>';
     document.getElementById('speedtest-result').textContent = '';
-
     clearInterval(state.speedtestPoll);
     state.speedtestPoll = setInterval(async () => {
         const st = await api('/speedtest');
-        document.getElementById('speedtest-progress').style.width = `${st.progress || 0}%`;
-
-        if (st.running) {
-            const spd = st.speed > 0 ? `${humanSize(st.speed)}/s` : '—';
-            document.getElementById('speedtest-result').textContent = `Sebesség: ${spd}`;
-        } else {
-            clearInterval(state.speedtestPoll);
-            if (st.error) {
-                document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-red">Hiba</span>';
-                document.getElementById('speedtest-result').textContent = st.error;
-            } else if (st.result) {
-                const r = st.result;
-                document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-green">Kész</span>';
-                let txt = `Írási sebesség: ${r.avg_speed_human}`;
-                if (r.estimated_eta) txt += ` | Becsült idő ${r.pending_human}-hez: ${r.estimated_eta}`;
-                document.getElementById('speedtest-result').textContent = txt;
+        document.getElementById('speedtest-progress').style.width = `${st.progress||0}%`;
+        if (st.running) { document.getElementById('speedtest-result').textContent = st.speed > 0 ? `${humanSize(st.speed)}/s` : 'Mérés...'; }
+        else { clearInterval(state.speedtestPoll);
+            if (st.error) { document.getElementById('speedtest-status').innerHTML='<span class="badge badge-red">Hiba</span>'; document.getElementById('speedtest-result').textContent=st.error; }
+            else if (st.result) { const r=st.result; document.getElementById('speedtest-status').innerHTML=`<span class="badge badge-green">Kész (${r.mode})</span>`;
+                document.getElementById('speedtest-result').textContent = `${r.avg_speed_human}${r.estimated_eta ? ' · ETA: '+r.estimated_eta+' ('+r.pending_human+')':''}`;
             }
         }
     }, 500);
@@ -564,108 +520,97 @@ async function runSpeedtest() {
 
 // ==================== Transfer ====================
 async function startTransferFromSelection() {
-    if (state.selectedFiles.size === 0) return;
-
-    const files = [];
-    const sizes = [];
-    for (const f of state.selectedFiles.values()) {
-        files.push(f.fullPath);
-        sizes.push(f.size);
-    }
-
-    const data = await api('/transfer', {
-        method: 'POST',
-        body: { files, sizes, destination: '' },
-    });
-
-    if (data.error) { toast(data.error, 'error'); return; }
-
-    toast(`Átvitel indítva (${files.length} fájl)`, 'success');
-    clearSelection();
-    switchTab('transfers');
+    if (!state.selectedFiles.size) return;
+    const files=[], sizes=[];
+    for (const f of state.selectedFiles.values()) { files.push(f.fullPath); sizes.push(f.size); }
+    const d = await api('/transfer', { method:'POST', body:{files,sizes,destination:''} });
+    if (d.error) { toast(d.error,'error'); return; }
+    toast(`Átvitel indítva (${files.length} fájl)`,'success'); clearSelection(); switchTab('transfers');
 }
 
-// ==================== Transfer Polling ====================
 async function pollTransfers() {
     clearInterval(state.pollInterval);
-
-    const update = async () => {
-        const data = await api('/transfers');
-        if (data.transfers) renderTransfers(data.transfers);
-        const hasActive = data.transfers?.some(t => ['pending','mounting','transferring'].includes(t.status));
-        if (!hasActive) clearInterval(state.pollInterval);
+    const upd = async () => {
+        const d = await api('/transfers');
+        if (d.transfers) renderTransfers(d.transfers);
+        if (!d.transfers?.some(t=>['pending','mounting','transferring'].includes(t.status))) clearInterval(state.pollInterval);
     };
-
-    await update();
-    state.pollInterval = setInterval(update, 1000);
+    await upd(); state.pollInterval = setInterval(upd, 1000);
 }
 
-function renderTransfers(transfers) {
+function renderTransfers(ts) {
     const el = document.getElementById('transfers-list');
-    if (!transfers.length) {
-        el.innerHTML = `<div class="text-center py-8" style="color:var(--text-dim);"><p class="text-lg mb-2">📤</p><p>Még nincs átvitel</p></div>`;
-        return;
-    }
-
-    el.innerHTML = transfers.map(t => {
-        const badges = {
-            pending: '<span class="badge badge-yellow">Várakozik</span>',
-            mounting: '<span class="badge badge-yellow">Csatlakozás...</span>',
-            transferring: '<span class="badge badge-blue">Másolás</span>',
-            completed: '<span class="badge badge-green">Kész ✓</span>',
-            failed: '<span class="badge badge-red">Hiba ✗</span>',
-            cancelled: '<span class="badge badge-red">Megszakítva</span>',
-        };
-        const isActive = ['pending','mounting','transferring'].includes(t.status);
-        const retryNote = t.retry_count > 0 ? `<span class="text-xs ml-2" style="color:var(--warning);">🔄 ${t.retry_count} retry</span>` : '';
-
-        return `
-        <div class="card p-3 mb-3">
+    if (!ts.length) { el.innerHTML='<div class="text-center py-8" style="color:var(--text-dim);">📤 Még nincs átvitel</div>'; return; }
+    el.innerHTML = ts.map(t => {
+        const b = {pending:'badge-yellow',mounting:'badge-yellow',transferring:'badge-blue',completed:'badge-green',failed:'badge-red',cancelled:'badge-red'};
+        const l = {pending:'Várakozik',mounting:'Csatlakozás',transferring:'Másolás',completed:'Kész ✓',failed:'Hiba ✗',cancelled:'Megszakítva'};
+        const active = ['pending','mounting','transferring'].includes(t.status);
+        const retry = t.retry_count>0 ? `<span class="text-xs ml-2" style="color:var(--warning);">🔄${t.retry_count}</span>` : '';
+        return `<div class="card p-3 mb-3">
             <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                    ${isActive ? '<div class="spinner"></div>' : ''}
-                    ${badges[t.status] || ''}${retryNote}
-                </div>
-                <span class="text-xs" style="color:var(--text-dim);">${t.files_done}/${t.files_total} fájl · ${t.total_bytes_human}</span>
-            </div>
-            ${t.current_file ? `<div class="text-sm truncate mb-2" style="color:var(--text-dim);">${t.current_file}</div>` : ''}
-            <div class="progress-bar mb-1">
-                <div class="progress-fill" style="width:${t.progress.toFixed(1)}%"></div>
-            </div>
-            <div class="flex justify-between text-xs" style="color:var(--text-dim);">
-                <span>${t.progress.toFixed(1)}%</span>
-                <span>${[t.speed, t.avg_speed ? 'Átl: ' + t.avg_speed : '', t.eta ? 'ETA: ' + t.eta : ''].filter(Boolean).join(' · ')}</span>
-            </div>
-            ${t.error ? `<div class="text-xs mt-2" style="color:var(--danger);">⚠️ ${t.error}</div>` : ''}
-            ${isActive ? `<button class="btn btn-danger btn-sm mt-2 w-full" onclick="cancelJob('${t.id}')">Megszakítás</button>` : ''}
-        </div>`;
+                <div class="flex items-center gap-2">${active?'<div class="spinner"></div>':''}<span class="badge ${b[t.status]}">${l[t.status]}</span>${retry}</div>
+                <span class="text-xs" style="color:var(--text-dim);">${t.files_done}/${t.files_total} · ${t.total_bytes_human}</span></div>
+            ${t.current_file?`<div class="text-sm truncate mb-2" style="color:var(--text-dim);">${t.current_file}</div>`:''}
+            <div class="progress-bar mb-1"><div class="progress-fill" style="width:${t.progress.toFixed(1)}%"></div></div>
+            <div class="flex justify-between text-xs" style="color:var(--text-dim);"><span>${t.progress.toFixed(1)}%</span>
+                <span>${[t.speed,t.avg_speed?'Átl:'+t.avg_speed:'',t.eta?'ETA:'+t.eta:''].filter(Boolean).join(' · ')}</span></div>
+            ${t.error?`<div class="text-xs mt-2" style="color:var(--danger);">⚠️ ${t.error}</div>`:''}
+            ${active?`<button class="btn btn-danger btn-sm mt-2 w-full" onclick="cancelJob('${t.id}')">Megszakítás</button>`:''}</div>`;
     }).join('');
 }
 
-async function cancelJob(id) { await api(`/transfer/${id}/cancel`, { method: 'POST' }); pollTransfers(); }
+async function cancelJob(id) { await api(`/transfer/${id}/cancel`,{method:'POST'}); pollTransfers(); }
+
+// ==================== Transfer Mode ====================
+function selectMode(mode) {
+    state.transferMode = mode;
+    document.querySelectorAll('.mode-option').forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
+    document.querySelectorAll('[id^="mode-"]').forEach(el => el.classList.add('hidden'));
+    const modeEl = document.getElementById(`mode-${mode}`);
+    if (modeEl) modeEl.classList.remove('hidden');
+}
+
+// ==================== SSH Key ====================
+async function generateSSHKey() {
+    const d = await api('/ssh/keygen', {method:'POST'});
+    if (d.error) { toast(d.error,'error'); return; }
+    document.getElementById('ssh-pubkey').classList.remove('hidden');
+    document.getElementById('ssh-pubkey-value').textContent = d.public_key;
+}
 
 // ==================== Settings ====================
 async function loadSettings() {
-    const data = await api('/settings');
-    if (data.error) return;
-
-    document.getElementById('s-host').value = data.truenas?.host || '';
-    document.getElementById('s-share').value = data.truenas?.share || '';
-    document.getElementById('s-path').value = data.truenas?.path || '';
-    document.getElementById('s-user').value = data.truenas?.username || '';
-    document.getElementById('s-pass').value = data.truenas?.password || '';
-    document.getElementById('s-dest').value = data.transfer?.default_destination || '';
-    document.getElementById('s-bwlimit').value = data.transfer?.bandwidth_limit || 0;
-    document.getElementById('s-retry').value = data.transfer?.retry_attempts ?? 5;
-    document.getElementById('s-retry-delay').value = data.transfer?.retry_delay ?? 3;
-    document.getElementById('s-partial').checked = data.transfer?.partial_transfer !== false;
-
+    const d = await api('/settings');
+    if (d.error) return;
+    document.getElementById('s-host').value = d.truenas?.host || '';
+    // SMB
+    document.getElementById('s-share').value = d.truenas?.share || '';
+    document.getElementById('s-path').value = d.truenas?.path || '';
+    document.getElementById('s-user').value = d.truenas?.username || '';
+    document.getElementById('s-pass').value = d.truenas?.password || '';
+    // SSH
+    document.getElementById('s-ssh-user').value = d.transfer?.ssh_user || 'root';
+    document.getElementById('s-ssh-port').value = d.transfer?.ssh_port || 22;
+    document.getElementById('s-ssh-key').value = d.transfer?.ssh_key_path || '/root/.ssh/id_ed25519';
+    document.getElementById('s-ssh-remote').value = d.transfer?.ssh_remote_path || '';
+    // rsyncd
+    document.getElementById('s-rsyncd-module').value = d.transfer?.rsyncd_module || '';
+    document.getElementById('s-rsyncd-port').value = d.transfer?.rsyncd_port || 873;
+    document.getElementById('s-rsyncd-pass').value = d.transfer?.rsyncd_password || '';
+    // Transfer
+    document.getElementById('s-dest').value = d.transfer?.default_destination || '';
+    document.getElementById('s-bwlimit').value = d.transfer?.bandwidth_limit || 0;
+    document.getElementById('s-retry').value = d.transfer?.retry_attempts ?? 5;
+    document.getElementById('s-retry-delay').value = d.transfer?.retry_delay ?? 3;
+    document.getElementById('s-partial').checked = d.transfer?.partial_transfer !== false;
+    // Mode
+    selectMode(d.transfer?.mode || 'ssh');
     // Discord
-    const dc = data.discord || {};
-    const toggle = document.getElementById('s-discord-toggle');
-    const settings = document.getElementById('discord-settings');
-    if (dc.enabled) { toggle.classList.add('on'); settings.classList.remove('hidden'); }
-    else { toggle.classList.remove('on'); settings.classList.add('hidden'); }
+    const dc = d.discord || {};
+    const tog = document.getElementById('s-discord-toggle');
+    const ds = document.getElementById('discord-settings');
+    if (dc.enabled) { tog.classList.add('on'); ds.classList.remove('hidden'); }
+    else { tog.classList.remove('on'); ds.classList.add('hidden'); }
     document.getElementById('s-discord-url').value = dc.webhook_url || '';
     document.getElementById('s-notify-interval').value = dc.notify_interval || 10;
     document.getElementById('s-notify-start').checked = dc.notify_on_start !== false;
@@ -675,14 +620,11 @@ async function loadSettings() {
 }
 
 function toggleDiscord() {
-    const toggle = document.getElementById('s-discord-toggle');
-    const settings = document.getElementById('discord-settings');
-    toggle.classList.toggle('on');
-    settings.classList.toggle('hidden');
+    document.getElementById('s-discord-toggle').classList.toggle('on');
+    document.getElementById('discord-settings').classList.toggle('hidden');
 }
 
 async function saveSettings() {
-    const discordOn = document.getElementById('s-discord-toggle').classList.contains('on');
     const body = {
         truenas: {
             host: document.getElementById('s-host').value.trim(),
@@ -692,14 +634,22 @@ async function saveSettings() {
             password: document.getElementById('s-pass').value,
         },
         transfer: {
+            mode: state.transferMode,
             default_destination: document.getElementById('s-dest').value.trim(),
             bandwidth_limit: parseInt(document.getElementById('s-bwlimit').value) || 0,
             partial_transfer: document.getElementById('s-partial').checked,
             retry_attempts: parseInt(document.getElementById('s-retry').value) || 5,
             retry_delay: parseInt(document.getElementById('s-retry-delay').value) || 3,
+            ssh_user: document.getElementById('s-ssh-user').value.trim(),
+            ssh_port: parseInt(document.getElementById('s-ssh-port').value) || 22,
+            ssh_key_path: document.getElementById('s-ssh-key').value.trim(),
+            ssh_remote_path: document.getElementById('s-ssh-remote').value.trim(),
+            rsyncd_module: document.getElementById('s-rsyncd-module').value.trim(),
+            rsyncd_port: parseInt(document.getElementById('s-rsyncd-port').value) || 873,
+            rsyncd_password: document.getElementById('s-rsyncd-pass').value,
         },
         discord: {
-            enabled: discordOn,
+            enabled: document.getElementById('s-discord-toggle').classList.contains('on'),
             webhook_url: document.getElementById('s-discord-url').value.trim(),
             notify_interval: parseInt(document.getElementById('s-notify-interval').value) || 10,
             notify_on_start: document.getElementById('s-notify-start').checked,
@@ -708,55 +658,47 @@ async function saveSettings() {
             notify_on_speedtest: document.getElementById('s-notify-speedtest').checked,
         },
     };
-
-    const data = await api('/settings', { method: 'POST', body });
-    if (data.saved) { toast('Beállítások mentve ✓', 'success'); checkNasStatus(); }
-    else toast(data.error || 'Mentési hiba', 'error');
+    const d = await api('/settings', { method:'POST', body });
+    if (d.saved) { toast('Mentve ✓','success'); checkNasStatus(); }
+    else toast(d.error || 'Hiba','error');
 }
 
-async function testNasConnection() {
-    toast('Kapcsolódás...', 'info');
-    const data = await api('/nas/status');
-    toast(data.connected ? 'TrueNAS elérhető ✓' : (data.error || 'Nem elérhető'), data.connected ? 'success' : 'error');
+async function testConnection() {
+    toast('Tesztelés...','info');
+    const d = await api('/nas/status');
+    toast(d.connected ? `${d.mode.toUpperCase()} kapcsolat OK ✓` : (d.error || 'Nem elérhető'), d.connected ? 'success' : 'error');
 }
 
 async function testDiscord() {
     const url = document.getElementById('s-discord-url').value.trim();
-    if (!url) { toast('Adj meg egy webhook URL-t', 'warning'); return; }
-    const data = await api('/discord/test', { method: 'POST', body: { webhook_url: url } });
-    toast(data.success ? 'Teszt üzenet elküldve ✓' : (data.error || 'Hiba'), data.success ? 'success' : 'error');
+    if (!url) { toast('Adj meg webhook URL-t','warning'); return; }
+    const d = await api('/discord/test', { method:'POST', body:{webhook_url:url} });
+    toast(d.success ? 'Teszt elküldve ✓' : (d.error || 'Hiba'), d.success ? 'success' : 'error');
 }
 
 // ==================== Archive ====================
 async function loadArchiveStats() {
-    const data = await api('/archive/stats');
-    const el = document.getElementById('archive-stats');
-    if (data.total_files !== undefined) {
-        el.textContent = `${data.total_files} fájl archiválva (${data.total_size_human})`;
-    } else {
-        el.textContent = 'Nem elérhető';
-    }
+    const d = await api('/archive/stats');
+    document.getElementById('archive-stats').textContent = d.total_files !== undefined ?
+        `${d.total_files} fájl archiválva (${d.total_size_human})` : 'Nem elérhető';
 }
-
 async function clearArchive() {
-    if (!confirm('Biztosan törölni akarod az archiválási naplót? A fájlok a NAS-on maradnak, de újra másolhatók lesznek.')) return;
-    const data = await api('/archive/clear', { method: 'POST' });
-    if (data.cleared) { toast('Napló törölve', 'success'); loadArchiveStats(); }
+    if (!confirm('Napló törlése? A fájlok a NAS-on maradnak.')) return;
+    const d = await api('/archive/clear', {method:'POST'});
+    if (d.cleared) { toast('Törölve','success'); loadArchiveStats(); }
 }
 
 // ==================== NAS Status ====================
 async function checkNasStatus() {
-    const dot = document.getElementById('nas-dot');
-    const label = document.getElementById('nas-label');
-    const data = await api('/nas/status');
-    if (data.connected) { dot.style.background = 'var(--success)'; label.textContent = 'NAS ✓'; }
-    else { dot.style.background = 'var(--danger)'; label.textContent = 'NAS ✗'; }
+    const d = await api('/nas/status');
+    document.getElementById('nas-dot').style.background = d.connected ? 'var(--success)' : 'var(--danger)';
+    document.getElementById('nas-label').textContent = d.connected ? 'NAS ✓' : 'NAS ✗';
+    document.getElementById('mode-badge').textContent = (d.mode || '—').toUpperCase();
 }
 
 // ==================== Init ====================
 document.addEventListener('DOMContentLoaded', () => {
-    refreshDevices();
-    checkNasStatus();
+    refreshDevices(); checkNasStatus();
     setInterval(refreshDevices, 5000);
     setInterval(checkNasStatus, 30000);
 });
