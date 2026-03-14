@@ -281,6 +281,148 @@ def _is_mounted(path: str) -> bool:
         return False
 
 
+# ==================== Remote Folder Operations ====================
+
+
+def list_remote_folders(subpath: str = "") -> dict:
+    """List folders on the remote NAS at the base path + subpath."""
+    config = load_config()
+    mode = config["transfer"].get("mode", "ssh")
+    host = config["truenas"]["host"]
+    t = config["transfer"]
+
+    if not host:
+        return {"error": "TrueNAS nincs konfigurálva", "folders": []}
+
+    try:
+        if mode == "ssh":
+            user = t.get("ssh_user", "root")
+            key = t.get("ssh_key_path", "/root/.ssh/id_ed25519")
+            port = t.get("ssh_port", 22)
+            remote_base = t.get("ssh_remote_path", "").rstrip("/")
+            target = remote_base
+            if subpath.strip("/"):
+                target = f"{remote_base}/{subpath.strip('/')}"
+
+            result = subprocess.run(
+                [
+                    "ssh", "-i", key, "-p", str(port),
+                    "-o", "StrictHostKeyChecking=accept-new",
+                    "-o", "BatchMode=yes",
+                    "-o", "ConnectTimeout=5",
+                    f"{user}@{host}",
+                    f"find '{target}' -maxdepth 1 -mindepth 1 -type d -printf '%f\\n' 2>/dev/null | sort",
+                ],
+                capture_output=True, text=True, timeout=15,
+            )
+            folders = [f for f in result.stdout.strip().split("\n") if f]
+            return {"folders": folders, "current_path": subpath or "/"}
+
+        elif mode == "rsyncd":
+            module = t.get("rsyncd_module", "")
+            port_num = t.get("rsyncd_port", 873)
+            env = os.environ.copy()
+            pwd = t.get("rsyncd_password", "")
+            if pwd:
+                env["RSYNC_PASSWORD"] = pwd
+
+            rsync_path = f"rsync://{host}:{port_num}/{module}/"
+            if subpath.strip("/"):
+                rsync_path += subpath.strip("/") + "/"
+
+            result = subprocess.run(
+                ["rsync", "--list-only", rsync_path],
+                capture_output=True, text=True, timeout=15, env=env,
+            )
+            folders = []
+            for line in result.stdout.strip().split("\n"):
+                if line.startswith("d") and len(line) > 40:
+                    name = line.split(None, 4)[-1].rstrip("/")
+                    if name and name != ".":
+                        folders.append(name)
+            return {"folders": sorted(folders), "current_path": subpath or "/"}
+
+        elif mode == "smb":
+            mp = mount_smb()
+            if not mp:
+                return {"error": "SMB mount hiba", "folders": []}
+            nas_base = config["truenas"].get("path", "/").strip("/")
+            target = Path(mp)
+            if nas_base:
+                target = target / nas_base
+            if subpath.strip("/"):
+                target = target / subpath.strip("/")
+            if not target.exists():
+                return {"folders": [], "current_path": subpath or "/"}
+            folders = sorted([d.name for d in target.iterdir() if d.is_dir() and not d.name.startswith(".")])
+            return {"folders": folders, "current_path": subpath or "/"}
+
+    except Exception as e:
+        return {"error": str(e), "folders": []}
+
+    return {"error": "Ismeretlen mód", "folders": []}
+
+
+def create_remote_folder(folder_name: str, subpath: str = "") -> dict:
+    """Create a new folder on the remote NAS."""
+    config = load_config()
+    mode = config["transfer"].get("mode", "ssh")
+    host = config["truenas"]["host"]
+    t = config["transfer"]
+
+    # Sanitize folder name
+    folder_name = folder_name.strip().replace("/", "_").replace("\\", "_")
+    if not folder_name:
+        return {"error": "Üres mappanév"}
+
+    try:
+        if mode == "ssh":
+            user = t.get("ssh_user", "root")
+            key = t.get("ssh_key_path", "/root/.ssh/id_ed25519")
+            port = t.get("ssh_port", 22)
+            remote_base = t.get("ssh_remote_path", "").rstrip("/")
+            target = remote_base
+            if subpath.strip("/"):
+                target = f"{remote_base}/{subpath.strip('/')}"
+            full_path = f"{target}/{folder_name}"
+
+            result = subprocess.run(
+                [
+                    "ssh", "-i", key, "-p", str(port),
+                    "-o", "StrictHostKeyChecking=accept-new",
+                    "-o", "BatchMode=yes",
+                    f"{user}@{host}",
+                    f"mkdir -p '{full_path}'",
+                ],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0:
+                return {"created": True, "name": folder_name}
+            return {"error": result.stderr.strip()[:100]}
+
+        elif mode == "smb":
+            mp = mount_smb()
+            if not mp:
+                return {"error": "SMB mount hiba"}
+            nas_base = config["truenas"].get("path", "/").strip("/")
+            target = Path(mp)
+            if nas_base:
+                target = target / nas_base
+            if subpath.strip("/"):
+                target = target / subpath.strip("/")
+            new_dir = target / folder_name
+            new_dir.mkdir(parents=True, exist_ok=True)
+            return {"created": True, "name": folder_name}
+
+        elif mode == "rsyncd":
+            return {"error": "rsyncd módban nem lehet távoli mappát létrehozni"}
+
+    except Exception as e:
+        return {"error": str(e)}
+
+    return {"error": "Ismeretlen mód"}
+
+
 # ==================== Rsync Destination Builders ====================
 
 

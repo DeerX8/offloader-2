@@ -11,6 +11,7 @@ from app.transfer import (
     cancel_transfer, check_connection,
     get_transfer, get_transfers, start_transfer,
     remove_transfer, clear_finished_transfers,
+    list_remote_folders, create_remote_folder,
 )
 from app.speedtest import get_speedtest_state, start_speedtest, get_last_speedtest
 from app.discord_notify import test_webhook
@@ -128,6 +129,24 @@ def api_clear_transfers():
 @api.route("/nas/status")
 def api_nas_status():
     return jsonify(check_connection())
+
+
+# --- Remote Folders ---
+
+@api.route("/nas/folders")
+def api_nas_folders():
+    """List folders on the NAS at the configured base path."""
+    subpath = request.args.get("path", "")
+    return jsonify(list_remote_folders(subpath))
+
+
+@api.route("/nas/folders", methods=["POST"])
+def api_create_folder():
+    """Create a new folder on the NAS."""
+    data = request.get_json()
+    name = data.get("name", "")
+    subpath = data.get("path", "")
+    return jsonify(create_remote_folder(name, subpath))
 
 
 # --- Speedtest ---

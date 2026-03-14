@@ -6,156 +6,127 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#0f172a">
     <title>Pi Archiver</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
-        :root {
-            --accent: #3b82f6; --accent-dark: #2563eb;
-            --bg: #0f172a; --bg-card: #1e293b; --bg-input: #334155;
-            --border: #475569; --text: #f1f5f9; --text-dim: #94a3b8;
-            --success: #22c55e; --danger: #ef4444; --warning: #f59e0b;
-        }
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; }
-        .card { background: var(--bg-card); border-radius: 12px; border: 1px solid rgba(71,85,105,0.3); }
-        .btn {
-            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-            padding: 10px 18px; border-radius: 10px; font-weight: 600; font-size: 14px;
-            transition: all 0.15s; cursor: pointer; border: none; user-select: none;
-        }
-        .btn-primary { background: var(--accent); color: white; }
-        .btn-primary:hover { background: var(--accent-dark); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-dim); }
-        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
-        .btn-sm { padding: 6px 12px; font-size: 12px; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-warning { background: var(--warning); color: #1e293b; }
-        input, select {
-            background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px;
-            padding: 10px 12px; color: var(--text); font-size: 14px; width: 100%;
-            transition: border-color 0.15s;
-        }
-        input:focus, select:focus { outline: none; border-color: var(--accent); }
-        .tab { padding: 10px 0; font-size: 13px; font-weight: 600; color: var(--text-dim); cursor: pointer;
-               border-bottom: 2px solid transparent; transition: all 0.15s; text-align: center; flex: 1; }
-        .tab.active { color: var(--accent); border-color: var(--accent); }
-        .file-item {
-            display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-            border-bottom: 1px solid rgba(71,85,105,0.2); cursor: pointer;
-            transition: background 0.1s; user-select: none;
-        }
-        .file-item:active { background: rgba(59,130,246,0.1); }
-        .file-item.selected { background: rgba(59,130,246,0.15); }
-        .file-item.archived-item { opacity: 0.6; }
-        .checkbox {
-            width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--border);
-            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-            transition: all 0.15s;
-        }
-        .checkbox.checked { background: var(--accent); border-color: var(--accent); }
-        .checkbox.checked::after { content: "✓"; color: white; font-size: 13px; font-weight: bold; }
-        .progress-bar { height: 6px; border-radius: 3px; background: var(--bg-input); overflow: hidden; }
-        .progress-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
-        .progress-fill.speedtest { background: var(--warning); }
-        .badge {
-            display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 6px;
-            font-size: 11px; font-weight: 600; white-space: nowrap;
-        }
-        .badge-blue { background: rgba(59,130,246,0.2); color: #60a5fa; }
-        .badge-green { background: rgba(34,197,94,0.2); color: #4ade80; }
-        .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
-        .badge-yellow { background: rgba(245,158,11,0.2); color: #fbbf24; }
-        .badge-archived { background: rgba(34,197,94,0.15); color: #4ade80; font-size: 10px; padding: 1px 6px; }
-        .toast {
-            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-            padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 500;
-            z-index: 100; animation: toastIn 0.3s ease; max-width: 90vw;
-        }
-        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
-        .spinner { width: 18px; height: 18px; border: 2px solid var(--border);
-                   border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .fade-in { animation: fadeIn 0.2s ease; }
-        @keyframes fadeIn { from { opacity: 0; } }
-        .bottom-bar { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
-        .toggle { position: relative; width: 44px; height: 24px; border-radius: 12px; cursor: pointer;
-                  background: var(--border); transition: background 0.2s; flex-shrink: 0; }
-        .toggle.on { background: var(--accent); }
-        .toggle::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
-                         border-radius: 50%; background: white; transition: transform 0.2s; }
-        .toggle.on::after { transform: translateX(20px); }
-        .mode-option { padding: 10px 14px; border-radius: 8px; border: 2px solid var(--border);
-                       cursor: pointer; transition: all 0.15s; text-align: center; }
-        .mode-option.active { border-color: var(--accent); background: rgba(59,130,246,0.1); }
-        .mode-option .mode-title { font-weight: 700; font-size: 14px; }
-        .mode-option .mode-desc { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-        .code-block { background: var(--bg); border-radius: 6px; padding: 8px 12px; font-family: monospace;
-                      font-size: 12px; word-break: break-all; border: 1px solid var(--border); }
+        :root{--accent:#3b82f6;--accent-dark:#2563eb;--bg:#0f172a;--bg-card:#1e293b;--bg-input:#334155;--border:#475569;--text:#f1f5f9;--text-dim:#94a3b8;--success:#22c55e;--danger:#ef4444;--warning:#f59e0b}
+        *{-webkit-tap-highlight-color:transparent;box-sizing:border-box}
+        body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif}
+        .card{background:var(--bg-card);border-radius:12px;border:1px solid rgba(71,85,105,.3)}
+        .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;transition:all .15s;cursor:pointer;border:none;user-select:none}
+        .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-dark)}.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+        .btn-danger{background:var(--danger);color:#fff}.btn-success{background:var(--success);color:#fff}.btn-warning{background:var(--warning);color:#1e293b}
+        .btn-outline{background:0 0;border:1px solid var(--border);color:var(--text-dim)}.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+        .btn-sm{padding:6px 12px;font-size:12px}.btn-xs{padding:4px 8px;font-size:11px}
+        input,select{background:var(--bg-input);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:14px;width:100%;transition:border-color .15s}
+        input:focus,select:focus{outline:none;border-color:var(--accent)}
+        .tab{padding:10px 0;font-size:13px;font-weight:600;color:var(--text-dim);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;text-align:center;flex:1}
+        .tab.active{color:var(--accent);border-color:var(--accent)}
+        .file-item{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(71,85,105,.2);cursor:pointer;transition:background .1s;user-select:none}
+        .file-item:active{background:rgba(59,130,246,.1)}.file-item.selected{background:rgba(59,130,246,.15)}.file-item.archived-item{opacity:.6}
+        .checkbox{width:22px;height:22px;border-radius:6px;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .15s}
+        .checkbox.checked{background:var(--accent);border-color:var(--accent)}.checkbox.checked::after{content:"✓";color:#fff;font-size:13px;font-weight:700}
+        .progress-bar{height:6px;border-radius:3px;background:var(--bg-input);overflow:hidden}
+        .progress-fill{height:100%;border-radius:3px;background:var(--accent);transition:width .3s}.progress-fill.speedtest{background:var(--warning)}
+        .badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap}
+        .badge-blue{background:rgba(59,130,246,.2);color:#60a5fa}.badge-green{background:rgba(34,197,94,.2);color:#4ade80}
+        .badge-red{background:rgba(239,68,68,.2);color:#f87171}.badge-yellow{background:rgba(245,158,11,.2);color:#fbbf24}
+        .badge-archived{background:rgba(34,197,94,.15);color:#4ade80;font-size:10px;padding:1px 6px}
+        .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:200;animation:toastIn .3s ease;max-width:90vw}
+        @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}}
+        .spinner{width:18px;height:18px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .fade-in{animation:fadeIn .2s ease}@keyframes fadeIn{from{opacity:0}}
+        .bottom-bar{padding-bottom:max(16px,env(safe-area-inset-bottom))}
+        .toggle{position:relative;width:44px;height:24px;border-radius:12px;cursor:pointer;background:var(--border);transition:background .2s;flex-shrink:0}
+        .toggle.on{background:var(--accent)}.toggle::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .2s}
+        .toggle.on::after{transform:translateX(20px)}
+        .mode-option{padding:10px 14px;border-radius:8px;border:2px solid var(--border);cursor:pointer;transition:all .15s;text-align:center}
+        .mode-option.active{border-color:var(--accent);background:rgba(59,130,246,.1)}.mode-option .mode-title{font-weight:700;font-size:14px}.mode-option .mode-desc{font-size:11px;color:var(--text-dim);margin-top:2px}
+        .code-block{background:var(--bg);border-radius:6px;padding:8px 12px;font-family:monospace;font-size:12px;word-break:break-all;border:1px solid var(--border)}
+        .sort-btn{padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:0 0;color:var(--text-dim);transition:all .15s}
+        .sort-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(59,130,246,.1)}
+        /* Modal overlay */
+        .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn .15s ease}
+        .modal-box{background:var(--bg-card);border-radius:16px;border:1px solid var(--border);padding:24px;max-width:360px;width:100%;animation:modalIn .2s ease}
+        @keyframes modalIn{from{opacity:0;transform:scale(.95)}}
+        .modal-title{font-size:18px;font-weight:700;margin-bottom:8px}
+        .modal-text{font-size:14px;color:var(--text-dim);margin-bottom:20px;line-height:1.5}
+        .modal-actions{display:flex;gap:10px;justify-content:flex-end}
+        /* Folder picker */
+        .folder-item{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:8px;cursor:pointer;transition:background .1s;font-size:14px}
+        .folder-item:hover{background:rgba(59,130,246,.1)}.folder-item.selected-folder{background:rgba(59,130,246,.2);border:1px solid var(--accent)}
     </style>
 </head>
 <body class="h-full flex flex-col">
 
-<header class="flex items-center justify-between px-4 py-3" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
+<header class="flex items-center justify-between px-4 py-3" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,.3)">
     <h1 class="text-lg font-bold">📦 Pi Archiver</h1>
     <div class="flex items-center gap-3">
         <span id="mode-badge" class="badge badge-blue">—</span>
-        <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-dim);">
-            <span id="nas-dot" style="width:8px;height:8px;border-radius:50%;background:var(--border);"></span>
+        <div class="flex items-center gap-1.5 text-xs" style="color:var(--text-dim)">
+            <span id="nas-dot" style="width:8px;height:8px;border-radius:50%;background:var(--border)"></span>
             <span id="nas-label">NAS</span>
         </div>
     </div>
 </header>
 
-<nav class="flex px-4" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,0.3);">
+<nav class="flex px-4" style="background:var(--bg-card);border-bottom:1px solid rgba(71,85,105,.3)">
     <div class="tab active" data-tab="files" onclick="switchTab('files')">📂 Fájlok</div>
     <div class="tab" data-tab="transfers" onclick="switchTab('transfers')">📤 Átvitel</div>
     <div class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ Beállítás</div>
 </nav>
 
-<main class="flex-1 overflow-y-auto">
+<main class="flex-1 overflow-y-auto" id="main-scroll">
 
 <!-- ==================== FILES TAB ==================== -->
 <div id="tab-files" class="fade-in">
-    <div class="px-4 py-3" style="border-bottom:1px solid rgba(71,85,105,0.2);">
+    <div class="px-4 py-3" style="border-bottom:1px solid rgba(71,85,105,.2)">
         <div class="flex items-center gap-2 mb-2">
-            <select id="device-select" onchange="onDeviceChange()" style="flex:1;" autocomplete="off">
+            <select id="device-select" onchange="onDeviceChange()" style="flex:1" autocomplete="off">
                 <option value="">💾 USB eszköz keresése...</option>
             </select>
             <button class="btn btn-outline btn-sm" onclick="refreshDevices()">🔄</button>
         </div>
-        <div class="flex items-center gap-2">
-            <select id="filter-select" onchange="onFilterChange()" style="flex:1;" autocomplete="off">
+        <div class="flex items-center gap-2 mb-2">
+            <select id="filter-select" onchange="onFilterChange()" style="flex:1" autocomplete="off">
                 <option value="all">Minden fájl</option>
                 <option value="photo">📷 Fotók</option>
                 <option value="video">🎬 Videók</option>
                 <option value="photo_video" selected>📷🎬 Fotó + Videó</option>
             </select>
-            <span id="file-count" class="text-xs" style="color:var(--text-dim);white-space:nowrap;">—</span>
+            <span id="file-count" class="text-xs" style="color:var(--text-dim);white-space:nowrap">—</span>
+        </div>
+        <!-- Destination Picker -->
+        <div class="flex items-center gap-2">
+            <span class="text-xs" style="color:var(--text-dim)">📍 Cél:</span>
+            <button id="dest-btn" class="btn btn-outline btn-xs" onclick="openDestPicker()" style="flex:1;justify-content:flex-start;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">/ (alapértelmezett)</button>
         </div>
     </div>
 
-    <div id="breadcrumb" class="px-4 py-2 flex items-center gap-1 text-sm overflow-x-auto" style="color:var(--text-dim);white-space:nowrap;"></div>
+    <div id="breadcrumb" class="px-4 py-2 flex items-center gap-1 text-sm overflow-x-auto" style="color:var(--text-dim);white-space:nowrap"></div>
 
-    <!-- Select All bar (shown when files are listed) -->
-    <div id="select-all-bar" class="hidden px-4 py-1 flex items-center justify-between" style="border-bottom:1px solid rgba(71,85,105,0.2);">
-        <button class="btn btn-outline btn-sm" onclick="selectAllFiles()">☑️ Mind kijelölése</button>
-        <span id="select-info" class="text-xs" style="color:var(--text-dim);"></span>
+    <!-- File toolbar: Select All + Sort -->
+    <div id="file-toolbar" class="hidden px-4 py-1.5 flex items-center justify-between" style="border-bottom:1px solid rgba(71,85,105,.2)">
+        <button class="btn btn-outline btn-xs" onclick="selectAllFiles()">☑️ Mind</button>
+        <div class="flex gap-1">
+            <button class="sort-btn active" data-sort="name" onclick="setSort('name')">Név</button>
+            <button class="sort-btn" data-sort="size" onclick="setSort('size')">Méret</button>
+        </div>
     </div>
 
     <div id="file-list" class="pb-20">
-        <div class="px-4 py-8 text-center" style="color:var(--text-dim);">
-            <p class="text-lg mb-2">💾</p>
-            <p>Csatlakoztass egy USB meghajtót</p>
+        <div class="px-4 py-8 text-center" style="color:var(--text-dim)">
+            <p class="text-lg mb-2">💾</p><p>Csatlakoztass egy USB meghajtót</p>
         </div>
     </div>
 
-    <div id="transfer-bar" class="bottom-bar hidden" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-card);border-top:1px solid rgba(71,85,105,0.3);padding:12px 16px;z-index:50;">
-        <div class="flex items-center justify-between mb-1">
+    <div id="transfer-bar" class="bottom-bar hidden" style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-card);border-top:1px solid rgba(71,85,105,.3);padding:12px 16px;z-index:50">
+        <div class="flex items-center justify-between">
             <div>
                 <span id="selected-count" class="font-bold">0</span> fájl
-                <span id="selected-size" class="text-sm" style="color:var(--text-dim);"></span>
-                <span id="selected-eta" class="text-sm" style="color:var(--warning);"></span>
+                <span id="selected-size" class="text-sm" style="color:var(--text-dim)"></span>
+                <span id="selected-eta" class="text-sm" style="color:var(--warning)"></span>
             </div>
             <div class="flex gap-2">
                 <button class="btn btn-outline btn-sm" onclick="clearSelection()">✕</button>
@@ -167,7 +138,6 @@
 
 <!-- ==================== TRANSFERS TAB ==================== -->
 <div id="tab-transfers" class="hidden fade-in">
-    <!-- Speedtest Section (always visible) -->
     <div class="mx-4 mt-4 card p-3">
         <div class="flex items-center justify-between mb-2">
             <span class="font-bold text-sm">🏎️ Speedtest</span>
@@ -176,668 +146,400 @@
                 <button id="speedtest-btn" class="btn btn-warning btn-sm" onclick="runSpeedtest()">▶ Indítás</button>
             </div>
         </div>
-        <div class="progress-bar mb-2">
-            <div id="speedtest-progress" class="progress-fill speedtest" style="width:0%"></div>
-        </div>
-        <div id="speedtest-result" class="text-sm" style="color:var(--text-dim);">Még nem volt mérés</div>
+        <div class="progress-bar mb-2"><div id="speedtest-progress" class="progress-fill speedtest" style="width:0%"></div></div>
+        <div id="speedtest-result" class="text-sm" style="color:var(--text-dim)">Még nem volt mérés</div>
     </div>
     <div id="transfers-list" class="px-4 py-4">
-        <div class="text-center py-8" style="color:var(--text-dim);">
-            <p class="text-lg mb-2">📤</p><p>Még nincs átvitel</p>
-        </div>
+        <div class="text-center py-8" style="color:var(--text-dim)">📤 Még nincs átvitel</div>
     </div>
 </div>
 
 <!-- ==================== SETTINGS TAB ==================== -->
 <div id="tab-settings" class="hidden fade-in p-4 space-y-4 pb-8">
-
-    <!-- TrueNAS Host -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">🖥️ TrueNAS szerver</h3>
-        <div>
-            <label class="text-xs mb-1 block" style="color:var(--text-dim);">Szerver cím (Tailscale IP)</label>
-            <input id="s-host" type="text" placeholder="pl. 100.x.x.x" autocomplete="off">
-        </div>
+        <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Szerver cím (Tailscale IP)</label>
+        <input id="s-host" type="text" placeholder="pl. 100.x.x.x" autocomplete="off"></div>
     </div>
-
-    <!-- Transfer Mode -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">📡 Átviteli mód</h3>
         <div class="grid grid-cols-3 gap-2 mb-4">
-            <div class="mode-option" data-mode="ssh" onclick="selectMode('ssh')">
-                <div class="mode-title">SSH</div>
-                <div class="mode-desc">Legjobb mobilneten</div>
-            </div>
-            <div class="mode-option" data-mode="rsyncd" onclick="selectMode('rsyncd')">
-                <div class="mode-title">rsyncd</div>
-                <div class="mode-desc">Docker a NAS-on</div>
-            </div>
-            <div class="mode-option" data-mode="smb" onclick="selectMode('smb')">
-                <div class="mode-title">SMB</div>
-                <div class="mode-desc">Egyszerű, lassabb</div>
-            </div>
+            <div class="mode-option" data-mode="ssh" onclick="selectMode('ssh')"><div class="mode-title">SSH</div><div class="mode-desc">Legjobb mobilneten</div></div>
+            <div class="mode-option" data-mode="rsyncd" onclick="selectMode('rsyncd')"><div class="mode-title">rsyncd</div><div class="mode-desc">Docker a NAS-on</div></div>
+            <div class="mode-option" data-mode="smb" onclick="selectMode('smb')"><div class="mode-title">SMB</div><div class="mode-desc">Egyszerű, lassabb</div></div>
         </div>
-
-        <!-- SSH Settings -->
         <div id="mode-ssh" class="space-y-3 hidden">
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH felhasználó</label>
-                    <input id="s-ssh-user" type="text" value="root" autocomplete="off">
-                </div>
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH port</label>
-                    <input id="s-ssh-port" type="number" value="22" autocomplete="off">
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">SSH felhasználó</label><input id="s-ssh-user" type="text" value="root" autocomplete="off"></div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">SSH port</label><input id="s-ssh-port" type="number" value="22" autocomplete="off"></div>
             </div>
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">SSH kulcs útvonal (a Pi-n)</label>
-                <input id="s-ssh-key" type="text" value="/root/.ssh/id_ed25519" autocomplete="off">
-            </div>
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Távoli útvonal a TrueNAS-on</label>
-                <input id="s-ssh-remote" type="text" placeholder="pl. /mnt/pool/archiv" autocomplete="off">
-            </div>
-            <div class="text-xs p-3 rounded-lg" style="background:var(--bg);color:var(--text-dim);">
-                <p class="font-bold mb-2">🔑 SSH kulcs beállítás:</p>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">SSH kulcs útvonal (a Pi-n)</label><input id="s-ssh-key" type="text" value="/root/.ssh/id_ed25519" autocomplete="off"></div>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Távoli útvonal a TrueNAS-on</label><input id="s-ssh-remote" type="text" placeholder="pl. /mnt/big_pool/archive" autocomplete="off"></div>
+            <div class="text-xs p-3 rounded-lg" style="background:var(--bg);color:var(--text-dim)">
+                <p class="font-bold mb-2">🔑 SSH kulcs:</p>
                 <button class="btn btn-outline btn-sm mb-2" onclick="generateSSHKey()">Kulcs generálása / megjelenítése</button>
-                <div id="ssh-pubkey" class="hidden">
-                    <p class="mb-1">Ezt a publikus kulcsot másold be a TrueNAS-ra:</p>
-                    <div id="ssh-pubkey-value" class="code-block"></div>
-                    <p class="mt-2">TrueNAS: Credentials → Local Users → [user] → SSH Public Key</p>
-                </div>
+                <div id="ssh-pubkey" class="hidden"><p class="mb-1">Publikus kulcs (másold a TrueNAS-ra):</p><div id="ssh-pubkey-value" class="code-block"></div></div>
             </div>
         </div>
-
-        <!-- rsyncd Settings -->
         <div id="mode-rsyncd" class="space-y-3 hidden">
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">rsyncd modul neve</label>
-                    <input id="s-rsyncd-module" type="text" placeholder="pl. archiv" autocomplete="off">
-                </div>
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Port</label>
-                    <input id="s-rsyncd-port" type="number" value="873" autocomplete="off">
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">rsyncd modul</label><input id="s-rsyncd-module" type="text" placeholder="pl. archiv" autocomplete="off"></div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Port</label><input id="s-rsyncd-port" type="number" value="873" autocomplete="off"></div>
             </div>
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">rsyncd jelszó (opcionális)</label>
-                <input id="s-rsyncd-pass" type="text" autocomplete="off">
-            </div>
-            <div class="text-xs p-3 rounded-lg" style="background:var(--bg);color:var(--text-dim);">
-                <p class="font-bold mb-1">📦 TrueNAS Docker beállítás:</p>
-                <p>Indíts egy rsyncd konténert a TrueNAS-on, pl.:</p>
-                <div class="code-block mt-1">docker run -d --name rsyncd -p 873:873 -v /mnt/pool/archiv:/data axiom/rsync-server</div>
-            </div>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">rsyncd jelszó</label><input id="s-rsyncd-pass" type="text" autocomplete="off"></div>
         </div>
-
-        <!-- SMB Settings -->
         <div id="mode-smb" class="space-y-3 hidden">
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">SMB share neve</label>
-                <input id="s-share" type="text" placeholder="pl. archiv" autocomplete="off">
-            </div>
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alap útvonal a share-en belül</label>
-                <input id="s-path" type="text" placeholder="pl. /Photos/2025" autocomplete="off">
-            </div>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">SMB share neve</label><input id="s-share" type="text" placeholder="pl. archiv" autocomplete="off"></div>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Alap útvonal</label><input id="s-path" type="text" placeholder="pl. /Photos/2025" autocomplete="off"></div>
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Felhasználó</label>
-                    <input id="s-user" type="text" placeholder="username" autocomplete="off">
-                </div>
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Jelszó</label>
-                    <input id="s-pass" type="text" autocomplete="off" style="-webkit-text-security:disc;">
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Felhasználó</label><input id="s-user" type="text" autocomplete="off"></div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Jelszó</label><input id="s-pass" type="text" autocomplete="off" style="-webkit-text-security:disc"></div>
             </div>
         </div>
-
         <button class="btn btn-outline btn-sm mt-3" onclick="testConnection()">🔌 Kapcsolat tesztelése</button>
     </div>
-
-    <!-- Transfer Settings -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">📤 Átvitel</h3>
         <div class="space-y-3">
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Alapértelmezett cél mappa</label>
-                <input id="s-dest" type="text" placeholder="pl. /Napi" autocomplete="off">
-            </div>
-            <div>
-                <label class="text-xs mb-1 block" style="color:var(--text-dim);">Sávszélesség limit (KB/s, 0 = korlátlan)</label>
-                <input id="s-bwlimit" type="number" value="0" min="0" autocomplete="off">
-            </div>
+            <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Sávszélesség limit (KB/s, 0=korlátlan)</label><input id="s-bwlimit" type="number" value="0" min="0" autocomplete="off"></div>
             <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Újrapróbálkozás (db)</label>
-                    <input id="s-retry" type="number" value="5" min="0" max="20" autocomplete="off">
-                </div>
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Retry közt (mp)</label>
-                    <input id="s-retry-delay" type="number" value="3" min="1" max="30" autocomplete="off">
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Retry (db)</label><input id="s-retry" type="number" value="5" autocomplete="off"></div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Retry közt (mp)</label><input id="s-retry-delay" type="number" value="3" autocomplete="off"></div>
             </div>
-            <div class="flex items-center gap-2">
-                <input id="s-partial" type="checkbox" checked style="width:auto;">
-                <label for="s-partial" class="text-sm">Félbeszakadt átvitel folytatása</label>
-            </div>
+            <div class="flex items-center gap-2"><input id="s-partial" type="checkbox" checked style="width:auto"><label for="s-partial" class="text-sm">Félbeszakadt átvitel folytatása</label></div>
         </div>
     </div>
-
-    <!-- Discord -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">💬 Discord</h3>
         <div class="space-y-3">
-            <div class="flex items-center justify-between">
-                <span class="text-sm">Discord értesítések</span>
-                <div id="s-discord-toggle" class="toggle" onclick="toggleDiscord()"></div>
-            </div>
+            <div class="flex items-center justify-between"><span class="text-sm">Értesítések</span><div id="s-discord-toggle" class="toggle" onclick="toggleDiscord()"></div></div>
             <div id="discord-settings" class="space-y-3 hidden">
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Webhook URL</label>
-                    <input id="s-discord-url" type="text" placeholder="https://discord.com/api/webhooks/..." autocomplete="off">
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Webhook URL</label><input id="s-discord-url" type="text" autocomplete="off"></div>
                 <button class="btn btn-outline btn-sm" onclick="testDiscord()">🔔 Teszt</button>
-                <div>
-                    <label class="text-xs mb-1 block" style="color:var(--text-dim);">Értesítés gyakorisága (%)</label>
-                    <select id="s-notify-interval" autocomplete="off">
-                        <option value="5">Minden 5%</option>
-                        <option value="10" selected>Minden 10%</option>
-                        <option value="25">Minden 25%</option>
-                        <option value="50">50% és végén</option>
-                    </select>
-                </div>
+                <div><label class="text-xs mb-1 block" style="color:var(--text-dim)">Értesítés gyakorisága (%)</label>
+                <select id="s-notify-interval" autocomplete="off"><option value="5">5%</option><option value="10" selected>10%</option><option value="25">25%</option><option value="50">50%</option></select></div>
                 <div class="space-y-2 text-sm">
-                    <label class="flex items-center gap-2"><input id="s-notify-start" type="checkbox" checked style="width:auto;"> Indításkor</label>
-                    <label class="flex items-center gap-2"><input id="s-notify-complete" type="checkbox" checked style="width:auto;"> Befejezéskor</label>
-                    <label class="flex items-center gap-2"><input id="s-notify-error" type="checkbox" checked style="width:auto;"> Hiba esetén</label>
-                    <label class="flex items-center gap-2"><input id="s-notify-speedtest" type="checkbox" checked style="width:auto;"> Speedtest után</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-start" type="checkbox" checked style="width:auto"> Indítás</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-complete" type="checkbox" checked style="width:auto"> Befejezés</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-error" type="checkbox" checked style="width:auto"> Hiba</label>
+                    <label class="flex items-center gap-2"><input id="s-notify-speedtest" type="checkbox" checked style="width:auto"> Speedtest</label>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Archive -->
     <div class="card p-4">
         <h3 class="font-bold mb-3">📋 Archiválási napló</h3>
-        <div id="archive-stats" class="text-sm mb-3" style="color:var(--text-dim);">Betöltés...</div>
+        <div id="archive-stats" class="text-sm mb-3" style="color:var(--text-dim)">Betöltés...</div>
         <button class="btn btn-danger btn-sm" onclick="clearArchive()">🗑️ Napló törlése</button>
     </div>
-
     <button class="btn btn-primary w-full" onclick="saveSettings()">💾 Beállítások mentése</button>
 </div>
 
 </main>
 
+<!-- ==================== MODAL CONTAINER ==================== -->
+<div id="modal-container"></div>
+
 <script>
 let state = {
-    currentMount: null, currentPath: '/', filter: 'photo_video',
-    selectedFiles: new Map(), pollInterval: null, speedtestPoll: null,
-    transferMode: 'ssh',
-    lastSpeed: 0, // bytes/sec from last speedtest
-    currentFiles: [], // current file listing for select all
+    currentMount:null, currentPath:'/', filter:'photo_video',
+    selectedFiles:new Map(), pollInterval:null, speedtestPoll:null,
+    transferMode:'ssh', lastSpeed:0, currentFiles:[], sortBy:'name', sortDir:1,
+    chosenDest:'',
 };
+
+// ==================== Modal ====================
+function showModal(title, text, buttons) {
+    const html = `<div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+        <div class="modal-box">
+            <div class="modal-title">${title}</div>
+            <div class="modal-text">${text}</div>
+            <div class="modal-actions">${buttons.map(b =>
+                `<button class="btn ${b.cls||'btn-outline'} btn-sm" onclick="${b.action}">${b.label}</button>`
+            ).join('')}</div>
+        </div></div>`;
+    document.getElementById('modal-container').innerHTML = html;
+}
+function closeModal() { document.getElementById('modal-container').innerHTML = ''; }
+function showInput(title, placeholder, onOk) {
+    const id = 'modal-input-' + Date.now();
+    showModal(title, `<input id="${id}" type="text" placeholder="${placeholder}" autocomplete="off" style="margin-top:4px">`,
+        [{label:'Mégse',action:'closeModal()'},{label:'OK',cls:'btn-primary',action:`(function(){const v=document.getElementById('${id}').value.trim();closeModal();if(v)(${onOk})(v)})()`}]);
+    setTimeout(()=>document.getElementById(id)?.focus(),100);
+}
 
 // ==================== Tabs ====================
 function switchTab(tab) {
-    document.querySelectorAll('[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-    document.querySelectorAll('[id^="tab-"]').forEach(el => el.classList.toggle('hidden', el.id !== `tab-${tab}`));
-    if (tab === 'transfers') pollTransfers();
-    if (tab === 'settings') { loadSettings(); loadArchiveStats(); }
+    document.querySelectorAll('[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+    document.querySelectorAll('[id^="tab-"]').forEach(el=>el.classList.toggle('hidden',el.id!==`tab-${tab}`));
+    if(tab==='transfers')pollTransfers();if(tab==='settings'){loadSettings();loadArchiveStats();}
 }
 
 // ==================== Toast ====================
-function toast(msg, type = 'info') {
-    const c = { info: 'var(--accent)', success: 'var(--success)', error: 'var(--danger)', warning: 'var(--warning)' };
-    const el = document.createElement('div');
-    el.className = 'toast'; el.style.background = c[type] || c.info; el.style.color = 'white'; el.textContent = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3000);
-}
+function toast(msg,type='info'){const c={info:'var(--accent)',success:'var(--success)',error:'var(--danger)',warning:'var(--warning)'};const el=document.createElement('div');el.className='toast';el.style.background=c[type]||c.info;el.style.color='#fff';el.textContent=msg;document.body.appendChild(el);setTimeout(()=>el.remove(),3000);}
 
 // ==================== API ====================
-async function api(endpoint, opts = {}) {
-    try {
-        const res = await fetch(`/api${endpoint}`, {
-            headers: opts.body ? { 'Content-Type': 'application/json' } : {},
-            ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined,
-        });
-        return await res.json();
-    } catch (e) { return { error: 'Hálózati hiba' }; }
-}
+async function api(ep,opts={}){try{const r=await fetch(`/api${ep}`,{headers:opts.body?{'Content-Type':'application/json'}:{},...opts,body:opts.body?JSON.stringify(opts.body):undefined});return await r.json()}catch(e){return{error:'Hálózati hiba'}}}
 
 // ==================== USB ====================
-async function refreshDevices() {
-    const sel = document.getElementById('device-select');
-    // Remember current selection
-    const prevDevice = state.currentMount ? state.currentMount : null;
-
-    // Don't show "searching" if we already have a device selected
-    if (!prevDevice) sel.innerHTML = '<option value="">⏳ Keresés...</option>';
-
-    const data = await api('/devices');
-
-    // Build new options
-    let html = '<option value="">💾 Válassz USB eszközt</option>';
-    let autoSelectIdx = -1;
-
-    if (data.devices?.length > 0) {
-        data.devices.forEach((dev, i) => {
-            const val = JSON.stringify(dev);
-            const label = `${dev.label || dev.device} (${dev.size}, ${dev.filesystem})${dev.mounted ? ' ✅' : ''}`;
-            html += `<option value='${val.replace(/'/g, "&#39;")}'>${label}</option>`;
-
-            // Re-select previously mounted device
-            if (prevDevice && dev.mounted && dev.mountpoint === prevDevice) {
-                autoSelectIdx = i + 1; // +1 because of the placeholder option
-            }
-        });
-
-        sel.innerHTML = html;
-
-        if (autoSelectIdx > 0) {
-            sel.selectedIndex = autoSelectIdx;
-        } else if (data.devices.length === 1 && !state.currentMount) {
-            sel.selectedIndex = 1;
-            onDeviceChange();
-        }
-    } else if (!prevDevice) {
-        sel.innerHTML = '<option value="">❌ Nem található USB eszköz</option>';
-    }
+async function refreshDevices(){
+    const sel=document.getElementById('device-select');const prev=state.currentMount;
+    if(!prev)sel.innerHTML='<option value="">⏳ Keresés...</option>';
+    const data=await api('/devices');
+    let html='<option value="">💾 Válassz USB eszközt</option>';let autoIdx=-1;
+    if(data.devices?.length>0){
+        data.devices.forEach((dev,i)=>{const val=JSON.stringify(dev);
+            html+=`<option value='${val.replace(/'/g,"&#39;")}'>${dev.label||dev.device} (${dev.size}, ${dev.filesystem})${dev.mounted?' ✅':''}</option>`;
+            if(prev&&dev.mounted&&dev.mountpoint===prev)autoIdx=i+1;});
+        sel.innerHTML=html;
+        if(autoIdx>0)sel.selectedIndex=autoIdx;
+        else if(data.devices.length===1&&!state.currentMount){sel.selectedIndex=1;onDeviceChange();}
+    }else if(!prev){sel.innerHTML='<option value="">❌ Nem található USB</option>';}
 }
-
-async function onDeviceChange() {
-    const sel = document.getElementById('device-select');
-    if (!sel.value) return;
-    const dev = JSON.parse(sel.value);
-    if (dev.mounted && dev.mountpoint) { state.currentMount = dev.mountpoint; state.currentPath = '/'; loadFiles(); return; }
-    const data = await api('/devices/mount', { method: 'POST', body: { device: dev.device } });
-    if (data.mounted) { state.currentMount = data.mountpoint; state.currentPath = '/'; toast('Csatlakoztatva', 'success'); loadFiles(); }
-    else toast(data.error || 'Mount hiba', 'error');
+async function onDeviceChange(){
+    const sel=document.getElementById('device-select');if(!sel.value)return;const dev=JSON.parse(sel.value);
+    if(dev.mounted&&dev.mountpoint){state.currentMount=dev.mountpoint;state.currentPath='/';loadFiles();return;}
+    const d=await api('/devices/mount',{method:'POST',body:{device:dev.device}});
+    if(d.mounted){state.currentMount=d.mountpoint;state.currentPath='/';toast('Csatlakoztatva','success');loadFiles();}
+    else toast(d.error||'Mount hiba','error');
 }
 
 // ==================== Files ====================
-async function loadFiles() {
-    if (!state.currentMount) return;
-    const el = document.getElementById('file-list');
-    el.innerHTML = '<div class="px-4 py-8 text-center"><div class="spinner mx-auto"></div></div>';
-    const data = await api(`/files?mount=${encodeURIComponent(state.currentMount)}&path=${encodeURIComponent(state.currentPath)}&filter=${state.filter}`);
-    if (data.error) { el.innerHTML = `<div class="px-4 py-8 text-center" style="color:var(--danger);">❌ ${data.error}</div>`; return; }
-    renderBreadcrumb(data.current_path || '/');
-    renderFileList(data);
+async function loadFiles(){
+    if(!state.currentMount)return;const el=document.getElementById('file-list');
+    el.innerHTML='<div class="px-4 py-8 text-center"><div class="spinner mx-auto"></div></div>';
+    const data=await api(`/files?mount=${encodeURIComponent(state.currentMount)}&path=${encodeURIComponent(state.currentPath)}&filter=${state.filter}`);
+    if(data.error){el.innerHTML=`<div class="px-4 py-8 text-center" style="color:var(--danger)">❌ ${data.error}</div>`;return;}
+    renderBreadcrumb(data.current_path||'/');
+    state.currentFiles=data.files.map(f=>({fullPath:`${state.currentMount}/${f.path}`,name:f.name,size:f.size,mtime:f.modified,archived:f.archived,extension:f.extension,size_human:f.size_human}));
+    renderFileList(data.directories);
 }
+function renderBreadcrumb(path){
+    const el=document.getElementById('breadcrumb');const parts=path.split('/').filter(Boolean);
+    let html=`<span class="cursor-pointer" onclick="navigateTo('/')" style="color:var(--accent)">🏠</span>`;let acc='';
+    parts.forEach((p,i)=>{acc+='/'+p;html+=` <span style="color:var(--border)">/</span> `;
+        html+=i===parts.length-1?`<span class="font-medium">${p}</span>`:`<span class="cursor-pointer" onclick="navigateTo('${acc}')" style="color:var(--accent)">${p}</span>`;});
+    el.innerHTML=html;
+}
+function renderFileList(dirs){
+    const el=document.getElementById('file-list');const files=getSortedFiles();
+    const arc=files.filter(f=>f.archived).length;const arcNote=arc>0?` (${arc} ✅)`:'';
+    document.getElementById('file-count').textContent=`${files.length} fájl${arcNote}`;
+    const tb=document.getElementById('file-toolbar');tb.classList.toggle('hidden',files.length===0&&(!dirs||dirs.length===0));
+    if(!dirs?.length&&!files.length){el.innerHTML='<div class="px-4 py-8 text-center" style="color:var(--text-dim)">📭 Üres</div>';return;}
+    let html='';
+    if(dirs)dirs.forEach(d=>{html+=`<div class="file-item" onclick="navigateTo('${d.path}')"><span style="font-size:22px">📁</span><div style="flex:1;min-width:0"><div class="font-medium truncate">${d.name}</div><div class="text-xs" style="color:var(--text-dim)">${d.items} elem</div></div><span style="color:var(--text-dim)">›</span></div>`;});
+    files.forEach(f=>{const sel=state.selectedFiles.has(f.fullPath);const ab=f.archived?'<span class="badge badge-archived ml-1">✅</span>':'';
+        html+=`<div class="file-item${f.archived?' archived-item':''} ${sel?'selected':''}" data-fp="${esc(f.fullPath)}" onclick="toggleFile(this,'${esc(f.fullPath)}','${esc(f.name)}',${f.size},${f.mtime})">
+            <div class="checkbox ${sel?'checked':''}"></div><span style="font-size:20px">${fileIcon(f.extension)}</span>
+            <div style="flex:1;min-width:0"><div class="text-sm font-medium truncate">${esc(f.name)}${ab}</div><div class="text-xs" style="color:var(--text-dim)">${f.size_human}</div></div></div>`;});
+    el.innerHTML=html;
+}
+function getSortedFiles(){
+    const files=[...state.currentFiles];
+    if(state.sortBy==='size')files.sort((a,b)=>(b.size-a.size)*state.sortDir);
+    else files.sort((a,b)=>a.name.localeCompare(b.name)*state.sortDir);
+    return files;
+}
+function setSort(by){
+    if(state.sortBy===by)state.sortDir*=-1;else{state.sortBy=by;state.sortDir=1;}
+    document.querySelectorAll('.sort-btn').forEach(b=>b.classList.toggle('active',b.dataset.sort===by));
+    renderFileList(null); // Re-render files only, dirs already in DOM
+}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
+function fileIcon(e){const m={'.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.heic':'🖼️','.heif':'🖼️','.tiff':'🖼️','.tif':'🖼️','.raw':'📸','.cr2':'📸','.cr3':'📸','.nef':'📸','.arw':'📸','.orf':'📸','.rw2':'📸','.dng':'📸','.mp4':'🎬','.mov':'🎬','.avi':'🎬','.mkv':'🎬','.mts':'🎬','.m2ts':'🎬','.mxf':'🎬','.braw':'🎬'};return m[e]||'📄';}
+function navigateTo(p){state.currentPath=p;loadFiles();}
+function onFilterChange(){state.filter=document.getElementById('filter-select').value;loadFiles();}
 
-function renderBreadcrumb(path) {
-    const el = document.getElementById('breadcrumb');
-    const parts = path.split('/').filter(Boolean);
-    let html = `<span class="cursor-pointer" onclick="navigateTo('/')" style="color:var(--accent);">🏠</span>`;
-    let acc = '';
-    parts.forEach((p, i) => {
-        acc += '/' + p;
-        html += ` <span style="color:var(--border);">/</span> `;
-        html += i === parts.length - 1 ? `<span class="font-medium">${p}</span>` :
-            `<span class="cursor-pointer" onclick="navigateTo('${acc}')" style="color:var(--accent);">${p}</span>`;
+// ==================== Selection (no scroll jump) ====================
+function toggleFile(el,fp,name,size,mt){
+    if(state.selectedFiles.has(fp)){state.selectedFiles.delete(fp);}
+    else{state.selectedFiles.set(fp,{name,size,fullPath:fp,mtime:mt});}
+    // Update DOM in place instead of full reload
+    const cb=el.querySelector('.checkbox');
+    cb.classList.toggle('checked');el.classList.toggle('selected');
+    updateSelectionUI();
+}
+function selectAllFiles(){
+    const files=getSortedFiles();const allSel=files.every(f=>state.selectedFiles.has(f.fullPath));
+    if(allSel)files.forEach(f=>state.selectedFiles.delete(f.fullPath));
+    else files.forEach(f=>{if(!state.selectedFiles.has(f.fullPath))state.selectedFiles.set(f.fullPath,{name:f.name,size:f.size,fullPath:f.fullPath,mtime:f.mtime});});
+    updateSelectionUI();
+    // Update checkboxes in DOM
+    document.querySelectorAll('.file-item[data-fp]').forEach(el=>{
+        const fp=el.dataset.fp;const sel=state.selectedFiles.has(fp);
+        el.classList.toggle('selected',sel);el.querySelector('.checkbox')?.classList.toggle('checked',sel);
     });
-    el.innerHTML = html;
 }
+function clearSelection(){state.selectedFiles.clear();updateSelectionUI();
+    document.querySelectorAll('.file-item.selected').forEach(el=>{el.classList.remove('selected');el.querySelector('.checkbox')?.classList.remove('checked');});}
+function updateSelectionUI(){
+    const bar=document.getElementById('transfer-bar');const n=state.selectedFiles.size;
+    if(n>0){bar.classList.remove('hidden');document.getElementById('selected-count').textContent=n;
+        const tb=Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+        document.getElementById('selected-size').textContent=`(${humanSize(tb)})`;
+        const eta=document.getElementById('selected-eta');
+        if(state.lastSpeed>0){eta.textContent=`· ETA: ${formatEta(tb/state.lastSpeed)}`;}else{eta.textContent='';}
+    }else{bar.classList.add('hidden');}
+}
+function humanSize(b){const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return`${b.toFixed(i===0?0:1)} ${u[i]}`;}
+function formatEta(s){if(s<60)return`${Math.round(s)}mp`;if(s<3600)return`${Math.floor(s/60)}p ${Math.round(s%60)}mp`;return`${Math.floor(s/3600)}ó ${Math.floor((s%3600)/60)}p`;}
 
-function renderFileList(data) {
-    const el = document.getElementById('file-list');
-    const arc = data.archived_count > 0 ? ` (${data.archived_count} ✅)` : '';
-    document.getElementById('file-count').textContent = `${data.total_files || 0} fájl${arc}`;
-
-    // Store files for select-all
-    state.currentFiles = data.files.map(f => ({
-        fullPath: `${state.currentMount}/${f.path}`,
-        name: f.name, size: f.size, mtime: f.modified, archived: f.archived,
-    }));
-
-    // Show/hide select all bar
-    const saBar = document.getElementById('select-all-bar');
-    if (data.files.length > 0) {
-        saBar.classList.remove('hidden');
-        const allSelected = data.files.every(f => state.selectedFiles.has(`${state.currentMount}/${f.path}`));
-        document.getElementById('select-info').textContent = allSelected ? 'Mind ki van jelölve' : '';
-    } else {
-        saBar.classList.add('hidden');
-    }
-
-    if (!data.directories.length && !data.files.length) { el.innerHTML = '<div class="px-4 py-8 text-center" style="color:var(--text-dim);">📭 Üres</div>'; return; }
-    let html = '';
-    data.directories.forEach(d => {
-        html += `<div class="file-item" onclick="navigateTo('${d.path}')">
-            <span style="font-size:22px;">📁</span>
-            <div style="flex:1;min-width:0;"><div class="font-medium truncate">${d.name}</div><div class="text-xs" style="color:var(--text-dim);">${d.items} elem</div></div>
-            <span style="color:var(--text-dim);">›</span></div>`;
+// ==================== Destination Picker ====================
+async function openDestPicker(){
+    const d=await api('/nas/folders');
+    if(d.error){toast(d.error,'error');return;}
+    let html=`<div class="folder-item ${!state.chosenDest?'selected-folder':''}" onclick="pickDest('')">📂 / (gyökér)</div>`;
+    d.folders.forEach(f=>{html+=`<div class="folder-item ${state.chosenDest===f?'selected-folder':''}" onclick="pickDest('${esc(f)}')">📁 ${esc(f)}</div>`;});
+    html+=`<div class="folder-item" onclick="createDestFolder()" style="color:var(--accent)">➕ Új mappa létrehozása</div>`;
+    showModal('📍 Cél mappa',html,[{label:'Bezárás',action:'closeModal()'}]);
+}
+function pickDest(folder){
+    state.chosenDest=folder;
+    document.getElementById('dest-btn').textContent=folder?`📁 ${folder}`:'/ (alapértelmezett)';
+    closeModal();
+}
+function createDestFolder(){
+    closeModal();
+    showInput('📁 Új mappa neve','pl. 2025-03-15',async function(name){
+        const d=await api('/nas/folders',{method:'POST',body:{name,path:state.chosenDest}});
+        if(d.created){toast(`Mappa létrehozva: ${name}`,'success');pickDest(state.chosenDest?state.chosenDest+'/'+name:name);}
+        else toast(d.error||'Hiba','error');
     });
-    data.files.forEach(f => {
-        const fp = `${state.currentMount}/${f.path}`;
-        const sel = state.selectedFiles.has(fp);
-        const ab = f.archived ? '<span class="badge badge-archived ml-1">✅</span>' : '';
-        html += `<div class="file-item${f.archived ? ' archived-item' : ''} ${sel ? 'selected' : ''}" onclick="toggleFile('${fp}','${esc(f.name)}',${f.size},${f.modified})">
-            <div class="checkbox ${sel ? 'checked' : ''}"></div>
-            <span style="font-size:20px;">${fileIcon(f.extension)}</span>
-            <div style="flex:1;min-width:0;"><div class="text-sm font-medium truncate">${esc(f.name)}${ab}</div><div class="text-xs" style="color:var(--text-dim);">${f.size_human}</div></div></div>`;
-    });
-    el.innerHTML = html;
-}
-
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;'); }
-function fileIcon(e) {
-    const m = {'.jpg':'🖼️','.jpeg':'🖼️','.png':'🖼️','.heic':'🖼️','.heif':'🖼️','.tiff':'🖼️','.tif':'🖼️','.raw':'📸','.cr2':'📸','.cr3':'📸','.nef':'📸','.arw':'📸','.orf':'📸','.rw2':'📸','.dng':'📸','.mp4':'🎬','.mov':'🎬','.avi':'🎬','.mkv':'🎬','.mts':'🎬','.m2ts':'🎬','.mxf':'🎬','.braw':'🎬'};
-    return m[e] || '📄';
-}
-function navigateTo(p) { state.currentPath = p; loadFiles(); }
-function onFilterChange() { state.filter = document.getElementById('filter-select').value; loadFiles(); }
-
-// ==================== Selection ====================
-function toggleFile(fp, name, size, mt) {
-    state.selectedFiles.has(fp) ? state.selectedFiles.delete(fp) : state.selectedFiles.set(fp, {name,size,fullPath:fp,mtime:mt});
-    updateSelectionUI(); loadFiles();
-}
-function selectAllFiles() {
-    const allSelected = state.currentFiles.every(f => state.selectedFiles.has(f.fullPath));
-    if (allSelected) {
-        // Deselect all in current view
-        state.currentFiles.forEach(f => state.selectedFiles.delete(f.fullPath));
-    } else {
-        // Select all in current view
-        state.currentFiles.forEach(f => {
-            if (!state.selectedFiles.has(f.fullPath)) {
-                state.selectedFiles.set(f.fullPath, { name: f.name, size: f.size, fullPath: f.fullPath, mtime: f.mtime });
-            }
-        });
-    }
-    updateSelectionUI(); loadFiles();
-}
-function clearSelection() { state.selectedFiles.clear(); updateSelectionUI(); loadFiles(); }
-function updateSelectionUI() {
-    const bar = document.getElementById('transfer-bar');
-    const n = state.selectedFiles.size;
-    if (n > 0) {
-        bar.classList.remove('hidden');
-        document.getElementById('selected-count').textContent = n;
-        const totalBytes = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
-        document.getElementById('selected-size').textContent = `(${humanSize(totalBytes)})`;
-        // Show ETA based on last speedtest
-        const etaEl = document.getElementById('selected-eta');
-        if (state.lastSpeed > 0) {
-            const etaSec = totalBytes / state.lastSpeed;
-            etaEl.textContent = `· ETA: ${formatEta(etaSec)}`;
-        } else {
-            etaEl.textContent = '';
-        }
-    } else {
-        bar.classList.add('hidden');
-    }
-}
-function humanSize(b) { const u=['B','KB','MB','GB','TB']; let i=0; while(b>=1024&&i<u.length-1){b/=1024;i++;} return `${b.toFixed(i===0?0:1)} ${u[i]}`; }
-function formatEta(sec) {
-    if (sec < 60) return `${Math.round(sec)}mp`;
-    if (sec < 3600) return `${Math.floor(sec/60)}p ${Math.round(sec%60)}mp`;
-    return `${Math.floor(sec/3600)}ó ${Math.floor((sec%3600)/60)}p`;
 }
 
 // ==================== Speedtest ====================
-async function runSpeedtest() {
-    const tb = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
-    const d = await api('/speedtest', { method:'POST', body:{total_pending_bytes:tb} });
-    if (d.error) { toast(d.error,'error'); return; }
-    toast('Speedtest indítva...','info');
-    switchTab('transfers');
-    document.getElementById('speedtest-btn').disabled = true;
-    document.getElementById('speedtest-status').innerHTML = '<span class="badge badge-yellow">Fut...</span>';
-    document.getElementById('speedtest-result').textContent = 'Mérés...';
-    document.getElementById('speedtest-progress').style.width = '0%';
+async function runSpeedtest(){
+    const tb=Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+    const d=await api('/speedtest',{method:'POST',body:{total_pending_bytes:tb}});
+    if(d.error){toast(d.error,'error');return;}
+    toast('Speedtest indítva...','info');switchTab('transfers');
+    document.getElementById('speedtest-btn').disabled=true;
+    document.getElementById('speedtest-status').innerHTML='<span class="badge badge-yellow">Fut...</span>';
+    document.getElementById('speedtest-result').textContent='Mérés...';document.getElementById('speedtest-progress').style.width='0%';
     clearInterval(state.speedtestPoll);
-    state.speedtestPoll = setInterval(async () => {
-        const st = await api('/speedtest');
-        document.getElementById('speedtest-progress').style.width = `${st.progress||0}%`;
-        if (st.running) {
-            document.getElementById('speedtest-result').textContent = st.speed > 0 ? `Sebesség: ${humanSize(st.speed)}/s` : 'Mérés...';
-        } else {
-            clearInterval(state.speedtestPoll);
-            document.getElementById('speedtest-btn').disabled = false;
-            if (st.error) {
-                document.getElementById('speedtest-status').innerHTML='<span class="badge badge-red">Hiba</span>';
-                document.getElementById('speedtest-result').textContent=st.error;
-            } else if (st.result) {
-                const r=st.result;
-                state.lastSpeed = r.avg_speed;
+    state.speedtestPoll=setInterval(async()=>{const st=await api('/speedtest');
+        document.getElementById('speedtest-progress').style.width=`${st.progress||0}%`;
+        if(st.running){document.getElementById('speedtest-result').textContent=st.speed>0?`Sebesség: ${humanSize(st.speed)}/s`:'Mérés...';}
+        else{clearInterval(state.speedtestPoll);document.getElementById('speedtest-btn').disabled=false;
+            if(st.error){document.getElementById('speedtest-status').innerHTML='<span class="badge badge-red">Hiba</span>';document.getElementById('speedtest-result').textContent=st.error;}
+            else if(st.result){const r=st.result;state.lastSpeed=r.avg_speed;
                 document.getElementById('speedtest-status').innerHTML=`<span class="badge badge-green">${r.avg_speed_human}</span>`;
-                let txt = `Írási sebesség: ${r.avg_speed_human} (${r.mode})`;
-                if (r.estimated_eta) txt += ` · ETA ${r.pending_human}-hez: ${r.estimated_eta}`;
-                document.getElementById('speedtest-result').textContent = txt;
-                updateSelectionUI(); // Refresh ETA in selection bar
-            }
-        }
-    }, 500);
+                let txt=`Írási sebesség: ${r.avg_speed_human} (${r.mode})`;if(r.estimated_eta)txt+=` · ETA ${r.pending_human}-hez: ${r.estimated_eta}`;
+                document.getElementById('speedtest-result').textContent=txt;updateSelectionUI();}}
+    },500);
 }
-
-async function loadLastSpeedtest() {
-    const d = await api('/speedtest/last');
-    if (d.last_speed > 0) {
-        state.lastSpeed = d.last_speed;
-        document.getElementById('speedtest-status').innerHTML = `<span class="badge badge-green">${d.last_speed_human}</span>`;
-        document.getElementById('speedtest-result').textContent = `Utolsó mérés: ${d.last_speed_human}`;
-    }
-}
+async function loadLastSpeedtest(){const d=await api('/speedtest/last');if(d.last_speed>0){state.lastSpeed=d.last_speed;
+    document.getElementById('speedtest-status').innerHTML=`<span class="badge badge-green">${d.last_speed_human}</span>`;
+    document.getElementById('speedtest-result').textContent=`Utolsó mérés: ${d.last_speed_human}`;}}
 
 // ==================== Transfer ====================
-function confirmTransfer() {
-    if (!state.selectedFiles.size) return;
-    const n = state.selectedFiles.size;
-    const totalBytes = Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
-    let msg = `${n} fájl másolása (${humanSize(totalBytes)})`;
-    if (state.lastSpeed > 0) {
-        msg += `\nBecsült idő: ${formatEta(totalBytes / state.lastSpeed)}`;
-    }
-    msg += '\n\nElindítod?';
-    if (confirm(msg)) startTransferFromSelection();
+function confirmTransfer(){
+    if(!state.selectedFiles.size)return;const n=state.selectedFiles.size;
+    const tb=Array.from(state.selectedFiles.values()).reduce((s,f)=>s+f.size,0);
+    const dest=state.chosenDest||'/ (alapértelmezett)';
+    let text=`<b>${n}</b> fájl · <b>${humanSize(tb)}</b><br>Cél: <b>${dest}</b>`;
+    if(state.lastSpeed>0)text+=`<br>Becsült idő: <b>${formatEta(tb/state.lastSpeed)}</b>`;
+    showModal('📤 Másolás indítása',text,[
+        {label:'Mégse',action:'closeModal()'},
+        {label:'Indítás',cls:'btn-primary',action:'closeModal();startTransferFromSelection()'}
+    ]);
+}
+async function startTransferFromSelection(){
+    if(!state.selectedFiles.size)return;const files=[],sizes=[];
+    for(const f of state.selectedFiles.values()){files.push(f.fullPath);sizes.push(f.size);}
+    const d=await api('/transfer',{method:'POST',body:{files,sizes,destination:state.chosenDest}});
+    if(d.error){toast(d.error,'error');return;}toast(`Átvitel indítva (${files.length} fájl)`,'success');clearSelection();switchTab('transfers');
 }
 
-async function startTransferFromSelection() {
-    if (!state.selectedFiles.size) return;
-    const files=[], sizes=[];
-    for (const f of state.selectedFiles.values()) { files.push(f.fullPath); sizes.push(f.size); }
-    const d = await api('/transfer', { method:'POST', body:{files,sizes,destination:''} });
-    if (d.error) { toast(d.error,'error'); return; }
-    toast(`Átvitel indítva (${files.length} fájl)`,'success'); clearSelection(); switchTab('transfers');
+// ==================== Transfer Polling ====================
+async function pollTransfers(){
+    clearInterval(state.pollInterval);const upd=async()=>{const d=await api('/transfers');if(d.transfers)renderTransfers(d.transfers);
+        if(!d.transfers?.some(t=>['pending','mounting','transferring'].includes(t.status)))clearInterval(state.pollInterval);};
+    await upd();state.pollInterval=setInterval(upd,1000);
 }
-
-async function pollTransfers() {
-    clearInterval(state.pollInterval);
-    const upd = async () => {
-        const d = await api('/transfers');
-        if (d.transfers) renderTransfers(d.transfers);
-        if (!d.transfers?.some(t=>['pending','mounting','transferring'].includes(t.status))) clearInterval(state.pollInterval);
-    };
-    await upd(); state.pollInterval = setInterval(upd, 1000);
-}
-
-function renderTransfers(ts) {
-    const el = document.getElementById('transfers-list');
-    if (!ts.length) { el.innerHTML='<div class="text-center py-8" style="color:var(--text-dim);">📤 Még nincs átvitel</div>'; return; }
-
-    const hasFinished = ts.some(t => ['completed','failed','cancelled'].includes(t.status));
-    let html = '';
-
-    if (hasFinished) {
-        html += '<div class="flex justify-end mb-3"><button class="btn btn-outline btn-sm" onclick="clearTransfers()">🗑️ Befejezettek törlése</button></div>';
-    }
-
-    html += ts.map(t => {
-        const b = {pending:'badge-yellow',mounting:'badge-yellow',transferring:'badge-blue',completed:'badge-green',failed:'badge-red',cancelled:'badge-red'};
-        const l = {pending:'Várakozik',mounting:'Csatlakozás',transferring:'Másolás',completed:'Kész ✓',failed:'Hiba ✗',cancelled:'Megszakítva'};
-        const active = ['pending','mounting','transferring'].includes(t.status);
-        const finished = ['completed','failed','cancelled'].includes(t.status);
-        const retry = t.retry_count>0 ? `<span class="text-xs ml-2" style="color:var(--warning);">🔄${t.retry_count}</span>` : '';
-        const removeBtn = finished ? `<button class="btn btn-outline btn-sm mt-2" onclick="removeJob('${t.id}')" style="flex:1;">🗑️ Törlés</button>` : '';
-        const cancelBtn = active ? `<button class="btn btn-danger btn-sm mt-2" onclick="cancelJob('${t.id}')" style="flex:1;">Megszakítás</button>` : '';
-        const buttons = (cancelBtn || removeBtn) ? `<div class="flex gap-2">${cancelBtn}${removeBtn}</div>` : '';
-
-        return `<div class="card p-3 mb-3">
-            <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">${active?'<div class="spinner"></div>':''}<span class="badge ${b[t.status]}">${l[t.status]}</span>${retry}</div>
-                <span class="text-xs" style="color:var(--text-dim);">${t.files_done}/${t.files_total} · ${t.total_bytes_human}</span></div>
-            ${t.current_file?`<div class="text-sm truncate mb-2" style="color:var(--text-dim);">${t.current_file}</div>`:''}
+function renderTransfers(ts){
+    const el=document.getElementById('transfers-list');
+    if(!ts.length){el.innerHTML='<div class="text-center py-8" style="color:var(--text-dim)">📤 Még nincs átvitel</div>';return;}
+    const hasFin=ts.some(t=>['completed','failed','cancelled'].includes(t.status));
+    let html='';if(hasFin)html+='<div class="flex justify-end mb-3"><button class="btn btn-outline btn-sm" onclick="clearTransfers()">🗑️ Befejezettek törlése</button></div>';
+    html+=ts.map(t=>{
+        const b={pending:'badge-yellow',mounting:'badge-yellow',transferring:'badge-blue',completed:'badge-green',failed:'badge-red',cancelled:'badge-red'};
+        const l={pending:'Várakozik',mounting:'Csatlakozás',transferring:'Másolás',completed:'Kész ✓',failed:'Hiba ✗',cancelled:'Megszakítva'};
+        const active=['pending','mounting','transferring'].includes(t.status);const fin=['completed','failed','cancelled'].includes(t.status);
+        const retry=t.retry_count>0?`<span class="text-xs ml-2" style="color:var(--warning)">🔄${t.retry_count}</span>`:'';
+        const rmBtn=fin?`<button class="btn btn-outline btn-sm mt-2" onclick="removeJob('${t.id}')" style="flex:1">🗑️</button>`:'';
+        const cBtn=active?`<button class="btn btn-danger btn-sm mt-2" onclick="confirmCancel('${t.id}')" style="flex:1">Megszakítás</button>`:'';
+        const btns=(cBtn||rmBtn)?`<div class="flex gap-2">${cBtn}${rmBtn}</div>`:'';
+        return`<div class="card p-3 mb-3"><div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-2">${active?'<div class="spinner"></div>':''}<span class="badge ${b[t.status]}">${l[t.status]}</span>${retry}</div>
+            <span class="text-xs" style="color:var(--text-dim)">${t.files_done}/${t.files_total} · ${t.total_bytes_human}</span></div>
+            ${t.current_file?`<div class="text-sm truncate mb-2" style="color:var(--text-dim)">${t.current_file}</div>`:''}
             <div class="progress-bar mb-1"><div class="progress-fill" style="width:${t.progress.toFixed(1)}%"></div></div>
-            <div class="flex justify-between text-xs" style="color:var(--text-dim);"><span>${t.progress.toFixed(1)}%</span>
+            <div class="flex justify-between text-xs" style="color:var(--text-dim)"><span>${t.progress.toFixed(1)}%</span>
                 <span>${[t.speed,t.avg_speed?'Átl:'+t.avg_speed:'',t.eta?'ETA:'+t.eta:''].filter(Boolean).join(' · ')}</span></div>
-            ${t.error?`<div class="text-xs mt-2" style="color:var(--danger);">⚠️ ${t.error}</div>`:''}
-            ${buttons}</div>`;
-    }).join('');
-
-    el.innerHTML = html;
+            ${t.error?`<div class="text-xs mt-2" style="color:var(--danger)">⚠️ ${t.error}</div>`:''}${btns}</div>`;
+    }).join('');el.innerHTML=html;
 }
-
-async function cancelJob(id) { if(confirm('Biztosan megszakítod az átvitelt?')) { await api(`/transfer/${id}/cancel`,{method:'POST'}); pollTransfers(); } }
-async function removeJob(id) { await api(`/transfer/${id}`,{method:'DELETE'}); pollTransfers(); }
-async function clearTransfers() { await api('/transfers/clear',{method:'POST'}); pollTransfers(); }
+function confirmCancel(id){showModal('Megszakítás','Biztosan megszakítod az átvitelt?',[{label:'Nem',action:'closeModal()'},{label:'Igen, megszakítás',cls:'btn-danger',action:`closeModal();cancelJob('${id}')`}]);}
+async function cancelJob(id){await api(`/transfer/${id}/cancel`,{method:'POST'});pollTransfers();}
+async function removeJob(id){await api(`/transfer/${id}`,{method:'DELETE'});pollTransfers();}
+async function clearTransfers(){await api('/transfers/clear',{method:'POST'});pollTransfers();}
 
 // ==================== Transfer Mode ====================
-function selectMode(mode) {
-    state.transferMode = mode;
-    document.querySelectorAll('.mode-option').forEach(el => el.classList.toggle('active', el.dataset.mode === mode));
-    document.querySelectorAll('[id^="mode-"]').forEach(el => el.classList.add('hidden'));
-    const modeEl = document.getElementById(`mode-${mode}`);
-    if (modeEl) modeEl.classList.remove('hidden');
-}
-
-// ==================== SSH Key ====================
-async function generateSSHKey() {
-    const d = await api('/ssh/keygen', {method:'POST'});
-    if (d.error) { toast(d.error,'error'); return; }
-    document.getElementById('ssh-pubkey').classList.remove('hidden');
-    document.getElementById('ssh-pubkey-value').textContent = d.public_key;
-}
+function selectMode(mode){state.transferMode=mode;document.querySelectorAll('.mode-option').forEach(el=>el.classList.toggle('active',el.dataset.mode===mode));
+    document.querySelectorAll('[id^="mode-"]').forEach(el=>el.classList.add('hidden'));const m=document.getElementById(`mode-${mode}`);if(m)m.classList.remove('hidden');}
+async function generateSSHKey(){const d=await api('/ssh/keygen',{method:'POST'});if(d.error){toast(d.error,'error');return;}
+    document.getElementById('ssh-pubkey').classList.remove('hidden');document.getElementById('ssh-pubkey-value').textContent=d.public_key;}
 
 // ==================== Settings ====================
-async function loadSettings() {
-    const d = await api('/settings');
-    if (d.error) return;
-    document.getElementById('s-host').value = d.truenas?.host || '';
-    // SMB
-    document.getElementById('s-share').value = d.truenas?.share || '';
-    document.getElementById('s-path').value = d.truenas?.path || '';
-    document.getElementById('s-user').value = d.truenas?.username || '';
-    document.getElementById('s-pass').value = d.truenas?.password || '';
-    // SSH
-    document.getElementById('s-ssh-user').value = d.transfer?.ssh_user || 'root';
-    document.getElementById('s-ssh-port').value = d.transfer?.ssh_port || 22;
-    document.getElementById('s-ssh-key').value = d.transfer?.ssh_key_path || '/root/.ssh/id_ed25519';
-    document.getElementById('s-ssh-remote').value = d.transfer?.ssh_remote_path || '';
-    // rsyncd
-    document.getElementById('s-rsyncd-module').value = d.transfer?.rsyncd_module || '';
-    document.getElementById('s-rsyncd-port').value = d.transfer?.rsyncd_port || 873;
-    document.getElementById('s-rsyncd-pass').value = d.transfer?.rsyncd_password || '';
-    // Transfer
-    document.getElementById('s-dest').value = d.transfer?.default_destination || '';
-    document.getElementById('s-bwlimit').value = d.transfer?.bandwidth_limit || 0;
-    document.getElementById('s-retry').value = d.transfer?.retry_attempts ?? 5;
-    document.getElementById('s-retry-delay').value = d.transfer?.retry_delay ?? 3;
-    document.getElementById('s-partial').checked = d.transfer?.partial_transfer !== false;
-    // Mode
-    selectMode(d.transfer?.mode || 'ssh');
-    // Discord
-    const dc = d.discord || {};
-    const tog = document.getElementById('s-discord-toggle');
-    const ds = document.getElementById('discord-settings');
-    if (dc.enabled) { tog.classList.add('on'); ds.classList.remove('hidden'); }
-    else { tog.classList.remove('on'); ds.classList.add('hidden'); }
-    document.getElementById('s-discord-url').value = dc.webhook_url || '';
-    document.getElementById('s-notify-interval').value = dc.notify_interval || 10;
-    document.getElementById('s-notify-start').checked = dc.notify_on_start !== false;
-    document.getElementById('s-notify-complete').checked = dc.notify_on_complete !== false;
-    document.getElementById('s-notify-error').checked = dc.notify_on_error !== false;
-    document.getElementById('s-notify-speedtest').checked = dc.notify_on_speedtest !== false;
+async function loadSettings(){
+    const d=await api('/settings');if(d.error)return;
+    document.getElementById('s-host').value=d.truenas?.host||'';
+    document.getElementById('s-share').value=d.truenas?.share||'';document.getElementById('s-path').value=d.truenas?.path||'';
+    document.getElementById('s-user').value=d.truenas?.username||'';document.getElementById('s-pass').value=d.truenas?.password||'';
+    document.getElementById('s-ssh-user').value=d.transfer?.ssh_user||'root';document.getElementById('s-ssh-port').value=d.transfer?.ssh_port||22;
+    document.getElementById('s-ssh-key').value=d.transfer?.ssh_key_path||'/root/.ssh/id_ed25519';document.getElementById('s-ssh-remote').value=d.transfer?.ssh_remote_path||'';
+    document.getElementById('s-rsyncd-module').value=d.transfer?.rsyncd_module||'';document.getElementById('s-rsyncd-port').value=d.transfer?.rsyncd_port||873;
+    document.getElementById('s-rsyncd-pass').value=d.transfer?.rsyncd_password||'';
+    document.getElementById('s-bwlimit').value=d.transfer?.bandwidth_limit||0;document.getElementById('s-retry').value=d.transfer?.retry_attempts??5;
+    document.getElementById('s-retry-delay').value=d.transfer?.retry_delay??3;document.getElementById('s-partial').checked=d.transfer?.partial_transfer!==false;
+    selectMode(d.transfer?.mode||'ssh');
+    const dc=d.discord||{};const tog=document.getElementById('s-discord-toggle');const ds=document.getElementById('discord-settings');
+    if(dc.enabled){tog.classList.add('on');ds.classList.remove('hidden');}else{tog.classList.remove('on');ds.classList.add('hidden');}
+    document.getElementById('s-discord-url').value=dc.webhook_url||'';document.getElementById('s-notify-interval').value=dc.notify_interval||10;
+    document.getElementById('s-notify-start').checked=dc.notify_on_start!==false;document.getElementById('s-notify-complete').checked=dc.notify_on_complete!==false;
+    document.getElementById('s-notify-error').checked=dc.notify_on_error!==false;document.getElementById('s-notify-speedtest').checked=dc.notify_on_speedtest!==false;
 }
-
-function toggleDiscord() {
-    document.getElementById('s-discord-toggle').classList.toggle('on');
-    document.getElementById('discord-settings').classList.toggle('hidden');
+function toggleDiscord(){document.getElementById('s-discord-toggle').classList.toggle('on');document.getElementById('discord-settings').classList.toggle('hidden');}
+async function saveSettings(){
+    const body={truenas:{host:document.getElementById('s-host').value.trim(),share:document.getElementById('s-share').value.trim(),
+        path:document.getElementById('s-path').value.trim(),username:document.getElementById('s-user').value.trim(),password:document.getElementById('s-pass').value},
+        transfer:{mode:state.transferMode,default_destination:'',bandwidth_limit:parseInt(document.getElementById('s-bwlimit').value)||0,
+            partial_transfer:document.getElementById('s-partial').checked,retry_attempts:parseInt(document.getElementById('s-retry').value)||5,
+            retry_delay:parseInt(document.getElementById('s-retry-delay').value)||3,ssh_user:document.getElementById('s-ssh-user').value.trim(),
+            ssh_port:parseInt(document.getElementById('s-ssh-port').value)||22,ssh_key_path:document.getElementById('s-ssh-key').value.trim(),
+            ssh_remote_path:document.getElementById('s-ssh-remote').value.trim(),rsyncd_module:document.getElementById('s-rsyncd-module').value.trim(),
+            rsyncd_port:parseInt(document.getElementById('s-rsyncd-port').value)||873,rsyncd_password:document.getElementById('s-rsyncd-pass').value},
+        discord:{enabled:document.getElementById('s-discord-toggle').classList.contains('on'),webhook_url:document.getElementById('s-discord-url').value.trim(),
+            notify_interval:parseInt(document.getElementById('s-notify-interval').value)||10,notify_on_start:document.getElementById('s-notify-start').checked,
+            notify_on_complete:document.getElementById('s-notify-complete').checked,notify_on_error:document.getElementById('s-notify-error').checked,
+            notify_on_speedtest:document.getElementById('s-notify-speedtest').checked}};
+    const d=await api('/settings',{method:'POST',body});if(d.saved){toast('Mentve ✓','success');checkNasStatus();}else toast(d.error||'Hiba','error');
 }
-
-async function saveSettings() {
-    const body = {
-        truenas: {
-            host: document.getElementById('s-host').value.trim(),
-            share: document.getElementById('s-share').value.trim(),
-            path: document.getElementById('s-path').value.trim(),
-            username: document.getElementById('s-user').value.trim(),
-            password: document.getElementById('s-pass').value,
-        },
-        transfer: {
-            mode: state.transferMode,
-            default_destination: document.getElementById('s-dest').value.trim(),
-            bandwidth_limit: parseInt(document.getElementById('s-bwlimit').value) || 0,
-            partial_transfer: document.getElementById('s-partial').checked,
-            retry_attempts: parseInt(document.getElementById('s-retry').value) || 5,
-            retry_delay: parseInt(document.getElementById('s-retry-delay').value) || 3,
-            ssh_user: document.getElementById('s-ssh-user').value.trim(),
-            ssh_port: parseInt(document.getElementById('s-ssh-port').value) || 22,
-            ssh_key_path: document.getElementById('s-ssh-key').value.trim(),
-            ssh_remote_path: document.getElementById('s-ssh-remote').value.trim(),
-            rsyncd_module: document.getElementById('s-rsyncd-module').value.trim(),
-            rsyncd_port: parseInt(document.getElementById('s-rsyncd-port').value) || 873,
-            rsyncd_password: document.getElementById('s-rsyncd-pass').value,
-        },
-        discord: {
-            enabled: document.getElementById('s-discord-toggle').classList.contains('on'),
-            webhook_url: document.getElementById('s-discord-url').value.trim(),
-            notify_interval: parseInt(document.getElementById('s-notify-interval').value) || 10,
-            notify_on_start: document.getElementById('s-notify-start').checked,
-            notify_on_complete: document.getElementById('s-notify-complete').checked,
-            notify_on_error: document.getElementById('s-notify-error').checked,
-            notify_on_speedtest: document.getElementById('s-notify-speedtest').checked,
-        },
-    };
-    const d = await api('/settings', { method:'POST', body });
-    if (d.saved) { toast('Mentve ✓','success'); checkNasStatus(); }
-    else toast(d.error || 'Hiba','error');
-}
-
-async function testConnection() {
-    toast('Tesztelés...','info');
-    const d = await api('/nas/status');
-    toast(d.connected ? `${d.mode.toUpperCase()} kapcsolat OK ✓` : (d.error || 'Nem elérhető'), d.connected ? 'success' : 'error');
-}
-
-async function testDiscord() {
-    const url = document.getElementById('s-discord-url').value.trim();
-    if (!url) { toast('Adj meg webhook URL-t','warning'); return; }
-    const d = await api('/discord/test', { method:'POST', body:{webhook_url:url} });
-    toast(d.success ? 'Teszt elküldve ✓' : (d.error || 'Hiba'), d.success ? 'success' : 'error');
-}
-
-// ==================== Archive ====================
-async function loadArchiveStats() {
-    const d = await api('/archive/stats');
-    document.getElementById('archive-stats').textContent = d.total_files !== undefined ?
-        `${d.total_files} fájl archiválva (${d.total_size_human})` : 'Nem elérhető';
-}
-async function clearArchive() {
-    if (!confirm('Napló törlése? A fájlok a NAS-on maradnak.')) return;
-    const d = await api('/archive/clear', {method:'POST'});
-    if (d.cleared) { toast('Törölve','success'); loadArchiveStats(); }
-}
-
-// ==================== NAS Status ====================
-async function checkNasStatus() {
-    const d = await api('/nas/status');
-    document.getElementById('nas-dot').style.background = d.connected ? 'var(--success)' : 'var(--danger)';
-    document.getElementById('nas-label').textContent = d.connected ? 'NAS ✓' : 'NAS ✗';
-    document.getElementById('mode-badge').textContent = (d.mode || '—').toUpperCase();
-}
+async function testConnection(){toast('Tesztelés...','info');const d=await api('/nas/status');
+    toast(d.connected?`${d.mode.toUpperCase()} OK ✓`:(d.error||'Nem elérhető'),d.connected?'success':'error');}
+async function testDiscord(){const url=document.getElementById('s-discord-url').value.trim();if(!url){toast('Adj meg URL-t','warning');return;}
+    const d=await api('/discord/test',{method:'POST',body:{webhook_url:url}});toast(d.success?'Elküldve ✓':(d.error||'Hiba'),d.success?'success':'error');}
+async function loadArchiveStats(){const d=await api('/archive/stats');document.getElementById('archive-stats').textContent=d.total_files!==undefined?`${d.total_files} fájl (${d.total_size_human})`:'N/A';}
+async function clearArchive(){showModal('🗑️ Napló törlése','Az archiválási napló törlődik. A fájlok a NAS-on maradnak, de újra másolhatók lesznek.',[
+    {label:'Mégse',action:'closeModal()'},{label:'Törlés',cls:'btn-danger',action:'closeModal();doClearArchive()'}]);}
+async function doClearArchive(){const d=await api('/archive/clear',{method:'POST'});if(d.cleared){toast('Törölve','success');loadArchiveStats();}}
+async function checkNasStatus(){const d=await api('/nas/status');document.getElementById('nas-dot').style.background=d.connected?'var(--success)':'var(--danger)';
+    document.getElementById('nas-label').textContent=d.connected?'NAS ✓':'NAS ✗';document.getElementById('mode-badge').textContent=(d.mode||'—').toUpperCase();}
 
 // ==================== Init ====================
-document.addEventListener('DOMContentLoaded', () => {
-    refreshDevices(); checkNasStatus(); loadLastSpeedtest();
-    setInterval(refreshDevices, 5000);
-    setInterval(checkNasStatus, 30000);
-});
+document.addEventListener('DOMContentLoaded',()=>{refreshDevices();checkNasStatus();loadLastSpeedtest();setInterval(refreshDevices,5000);setInterval(checkNasStatus,30000);});
 </script>
 </body>
 </html>
