@@ -415,7 +415,34 @@ def create_remote_folder(folder_name: str, subpath: str = "") -> dict:
             return {"created": True, "name": folder_name}
 
         elif mode == "rsyncd":
-            return {"error": "rsyncd módban nem lehet távoli mappát létrehozni"}
+            # rsyncd protocol has no mkdir — use SSH just for this operation
+            user = t.get("ssh_user", "root")
+            key = t.get("ssh_key_path", "/root/.ssh/id_ed25519")
+            port = t.get("ssh_port", 22)
+            remote_base = t.get("ssh_remote_path", "").rstrip("/")
+
+            if not key or not Path(key).exists():
+                return {"error": f"SSH kulcs nem található: {key} (mappalétrehozáshoz szükséges)"}
+
+            target = remote_base
+            if subpath.strip("/"):
+                target = f"{remote_base}/{subpath.strip('/')}"
+            full_path = f"{target}/{folder_name}"
+
+            result = subprocess.run(
+                [
+                    "ssh", "-i", key, "-p", str(port),
+                    "-o", "StrictHostKeyChecking=accept-new",
+                    "-o", "BatchMode=yes",
+                    "-o", "ConnectTimeout=5",
+                    f"{user}@{host}",
+                    f"mkdir -p '{full_path}'",
+                ],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode == 0:
+                return {"created": True, "name": folder_name}
+            return {"error": result.stderr.strip()[:100]}
 
     except Exception as e:
         return {"error": str(e)}
@@ -448,7 +475,13 @@ def _build_rsync_dest(config: dict, destination: str) -> tuple[list[str], str, d
         if dest_subpath:
             remote_path = f"{remote_base}/{dest_subpath}"
 
-        ssh_cmd = f"ssh -i {key} -p {port} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
+        ssh_cmd = (
+            f"ssh -i {key} -p {port}"
+            f" -o StrictHostKeyChecking=accept-new"
+            f" -o ConnectTimeout=10"
+            f" -o ServerAliveInterval=5"
+            f" -o ServerAliveCountMax=3"
+        )
         extra_args = ["-e", ssh_cmd]
         rsync_dest = f"{user}@{host}:{remote_path}/"
         return extra_args, rsync_dest, env

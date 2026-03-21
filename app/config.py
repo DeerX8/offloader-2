@@ -18,12 +18,12 @@ DEFAULT_CONFIG = {
         "password": "",
     },
     "transfer": {
-        "mode": "ssh",  # "smb", "ssh", "rsyncd"
+        "mode": "rsyncd",  # "smb", "ssh", "rsyncd"
         "default_destination": "/",
         "bandwidth_limit": 0,
         "partial_transfer": True,
         "retry_attempts": 5,
-        "retry_delay": 3,
+        "retry_delay": 10,
         # SSH mode settings
         "ssh_user": "root",
         "ssh_key_path": "/root/.ssh/id_ed25519",
